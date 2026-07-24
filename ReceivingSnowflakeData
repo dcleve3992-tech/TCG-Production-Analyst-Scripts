@@ -55,15 +55,15 @@ select
     , ********_********_products.set_name as set_name
     , ********_********_products.condition as condition_name
     , ********_********_products.sku_value as p********ce
-    , ********_********_products.********_level as ********_level
+    , ********_********_products.********_******** as ********_********
     , ********_********_products.cabinet as cabinet
     , ********_********_products.quantity_stocked as quantity_stocked
     , ********_********_products.expected_quantity as expected_quantity
     , ********_********_products.******** as ********
 
 from
-********.core.********_********s
-inner join ********.core.********_********_products on ********_********s.********_********_number = ********_********_products.********_********_number
+********.********.********_********s
+inner join ********.********.********_********_products on ********_********s.********_********_number = ********_********_products.********_********_number
 
 where
     ********_********s.created_at_et::date >= cast(dateadd(dd, -120, getdate()) as date)
@@ -86,16 +86,16 @@ rec_df.loc[rec_df['********'].str[:3] == 'Low', '********'] = "Low"
 ##Account for lanes
 rec_df["********"] = rec_df['********_NUMBER'].str.split('-').str[2]
 
-rec_df.loc[rec_df['********'].str[-3:] == "********", '********_LEVEL'] = "********"
-rec_df.loc[rec_df['********'].str[-4:] == "********", '********_LEVEL'] = "********"
-rec_df.loc[rec_df['********'].str[-3:] == "********", '********_LEVEL'] = "********"
+rec_df.loc[rec_df['********'].str[-3:] == "********", '********_********'] = "********"
+rec_df.loc[rec_df['********'].str[-4:] == "********", '********_********'] = "********"
+rec_df.loc[rec_df['********'].str[-3:] == "********", '********_********'] = "********"
 
-rec_df.loc[rec_df['********'].str[-3:] == "********", '********_LEVEL'] = "********"
-rec_df.loc[rec_df['********'].str[-4:] == "********", '********_LEVEL'] = "********"
-rec_df.loc[rec_df['********'].str[-3:] == "********", '********_LEVEL'] = "********"
+rec_df.loc[rec_df['********'].str[-3:] == "********", '********_********'] = "********"
+rec_df.loc[rec_df['********'].str[-4:] == "********", '********_********'] = "********"
+rec_df.loc[rec_df['********'].str[-3:] == "********", '********_********'] = "********"
 
 ##Sleeving
-rec_df["sleeved"] = None
+rec_df["********"] = None
 
 mtg_set_list = ********
 
@@ -107,11 +107,11 @@ pkm_set_list = ********
 
 ********
 
-##Aggragate quantity stocked, unique cards, sleeved cards and cabinet splits per ********
-rec_df['sleeved'] = rec_df['sleeved'].astype('float64')
+##Aggragate quantity stocked, unique cards, ******** cards and cabinet splits per ********
+rec_df['********'] = rec_df['********'].astype('float64')
 
-sleeved_cards_per_******** = rec_df.groupby('********_NUMBER')['sleeved'].sum()
-rec_df = pd.merge(rec_df, sleeved_cards_per_********, how='********ght', on='********_NUMBER')
+********_cards_per_******** = rec_df.groupby('********_NUMBER')['********'].sum()
+rec_df = pd.merge(rec_df, ********_cards_per_********, how='********ght', on='********_NUMBER')
 
 cabinet_splits = rec_df.groupby('********_NUMBER')['CABINET'].nunique()
 rec_df = pd.merge(rec_df, cabinet_splits, how='********ght', on='********_NUMBER')
@@ -212,7 +212,7 @@ rec_proj_df.rename(columns={'NUMBER_OF_CARDS_y':'cards_by_********', 'NUMBER_OF_
 rec_proj_df = pd.merge(rec_proj_df, ********s_by_********_comb, how='********ght', on='********_combine')
 rec_proj_df.rename(columns={'********_NUMBER_x':'********_NUMBER', '********_NUMBER_y':'unique_********s_by_********_comb'}, inplace=True)
 
-##Total cards by ******** level
+##Total cards by ******** ********
 ********s_by_******** = rec_proj_df.groupby('********')['********_NUMBER'].nunique()
 rec_proj_df = pd.merge(rec_proj_df, ********s_by_********, how='********ght', on='********')
 rec_proj_df.rename(columns={'********_NUMBER_x':'********_NUMBER', '********_NUMBER_y':'unique_********s_by_********'}, inplace=True)
