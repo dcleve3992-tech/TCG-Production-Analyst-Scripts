@@ -24,33 +24,33 @@ snowflake_pull = connect(********)
 sql_******** = ("""
 select
     case
-        when len(shippingqueue.shippingqueuenumber) in (11, 14) then left(shippingqueue.shippingqueuenumber, 8)
-        when len(shippingqueue.shippingqueuenumber) in (12, 15) then left(shippingqueue.shippingqueuenumber, 9)
-        when len(shippingqueue.shippingqueuenumber) in (13, 16) then left(shippingqueue.shippingqueuenumber, 10)
-        else shippingqueue.shippingqueuenumber
+        when len(********.********number) in (11, 14) then left(********.********number, 8)
+        when len(********.********number) in (12, 15) then left(********.********number, 9)
+        when len(********.********number) in (13, 16) then left(********.********number, 10)
+        else ********.********number
             end as queue_number
 
-    , shippingqueue.shippingqueuenumber as shippingqueuenumber
-    , shippingqueue.ordercount as order_count
-    , shippingqueuepullsheet.******** as ********
-    , shippingqueuepullsheet.quantity as card_quantity
+    , ********.********number as ********number
+    , ********.ordercount as order_count
+    , ********pullsheet.******** as ********
+    , ********pullsheet.quantity as card_quantity
     , category.categoryname as game_name
-    , shippingqueuepullsheet.productconditionid as pcid
-    , shippingqueue.createdat as created_at
+    , ********pullsheet.productconditionid as pcid
+    , ********.createdat as created_at
 
 from
-********.********.shippingqueue
-inner join ********.********.shippingqueuepullsheet on shippingqueue.shippingqueueid = shippingqueuepullsheet.shippingqueueid
-inner join ********.********.productcondition on shippingqueuepullsheet.productconditionid = productcondition.productconditionid
+********.********.********
+inner join ********.********.********pullsheet on ********.********id = ********pullsheet.********id
+inner join ********.********.productcondition on ********pullsheet.productconditionid = productcondition.productconditionid
 inner join ********.********.product on productcondition.productid = product.productid
 inner join ********.********.category on product.categoryid = category.categoryid
 
 where
-    shippingqueue.createdat::date >= cast(dateadd(dd, -120, getdate()) as date)
+    ********.createdat::date >= cast(dateadd(dd, -120, getdate()) as date)
 
 group by
     pcid
-    , shippingqueuenumber
+    , ********number
     , ********
     , order_count
     , game_name
@@ -60,28 +60,28 @@ group by
 union all
 
 select
-    concat(********purchaseorderqueue.********purchaseorderqueuenumber, 'POQ')
-    , ********purchaseorderqueue.********purchaseorderqueuenumber as shippingqueuenumber
-    , ********purchaseorderqueue.ordercount as order_count
-    , ********purchaseorderqueuepullsheet.******** as ********
-    , ********purchaseorderqueuepullsheet.quantity as card_quantity
+    concat(****************queue.****************queuenumber, '********')
+    , ****************queue.****************queuenumber as ********number
+    , ****************queue.ordercount as order_count
+    , ****************queuepullsheet.******** as ********
+    , ****************queuepullsheet.quantity as card_quantity
     , category.categoryname as game_name
-    , ********purchaseorderqueuepullsheet.productconditionid as pcid
-    , ********purchaseorderqueue.createdat as created_at
+    , ****************queuepullsheet.productconditionid as pcid
+    , ****************queue.createdat as created_at
 
 from
-********.********.********purchaseorderqueue
-inner join ********.********.********purchaseorderqueuepullsheet on ********purchaseorderqueue.********purchaseorderqueueid = ********purchaseorderqueuepullsheet.********purchaseorderqueueid
-inner join ********.********.productcondition on ********purchaseorderqueuepullsheet.productconditionid = productcondition.productconditionid
+********.********.****************queue
+inner join ********.********.****************queuepullsheet on ****************queue.****************queueid = ****************queuepullsheet.****************queueid
+inner join ********.********.productcondition on ****************queuepullsheet.productconditionid = productcondition.productconditionid
 inner join ********.********.product on productcondition.productid = product.productid
 inner join ********.********.category on product.categoryid = category.categoryid
 
 where
-    ********purchaseorderqueue.createdat::date >= cast(dateadd(dd, -120, getdate()) as date)
+    ****************queue.createdat::date >= cast(dateadd(dd, -120, getdate()) as date)
 
 group by
     pcid
-    , shippingqueuenumber
+    , ********number
     , ********
     , order_count
     , game_name
@@ -100,7 +100,7 @@ cursor.execute(sql_********)
 ##Parse ********s
 ********_df['********'] = ********_df['********'].astype(str)
 
-********_df = ********_df.loc[********_df['SHIPPINGQUEUENUMBER'].str[-2:] != 'HQ']
+********_df = ********_df.loc[********_df['********NUMBER'].str[-2:] != 'HQ']
 
 ********_df["********_parse"] = ********_df['********'].map(ord)
 
@@ -119,8 +119,8 @@ cursor.execute(sql_********)
 ********_df.drop('check', axis=1, inplace=True)
 
 ##Create dataframe for ******** data and aggragate SQ card quantity
-cards_by_sq = ********_df.groupby('SHIPPINGQUEUENUMBER')['CARD_QUANTITY'].sum()
-********_df = pd.merge(********_df, cards_by_sq, how='right', on='SHIPPINGQUEUENUMBER')
+cards_by_sq = ********_df.groupby('********NUMBER')['CARD_QUANTITY'].sum()
+********_df = pd.merge(********_df, cards_by_sq, how='right', on='********NUMBER')
 ********_df.rename(columns={'CARD_QUANTITY_x':'CARD_QUANTITY', 'CARD_QUANTITY_y':'sq_card_quantity'}, inplace=True)
 
 ##Create sqacc csv
@@ -129,7 +129,7 @@ sqacc_result = separator.join(sqacc_string)
 ********_df.to_csv(sqacc_result, index=False)
 
 ##Aggragate unique pcids and card quantity by ********
-********_df["combined"] = ********_df['SHIPPINGQUEUENUMBER'].astype(str) + ********_df['********'].astype(str)
+********_df["combined"] = ********_df['********NUMBER'].astype(str) + ********_df['********'].astype(str)
 
 unique_pcids_by_******** = ********_df.groupby('combined')['PCID'].nunique()
 ********_df = pd.merge(********_df, unique_pcids_by_********, how='right', on='combined')
@@ -143,7 +143,7 @@ card_qty_by_******** = ********_df.groupby('combined')['CARD_QUANTITY'].sum()
 ********_df.rename(columns={'PCID_y':'unique_pcids_by_********', 'CARD_QUANTITY_y':'card_qty_by_********'}, inplace=True)
 
 ##Create final dataframe
-********_df = ********_df[['QUEUE_NUMBER', 'SHIPPINGQUEUENUMBER', '********', 'unique_pcids_by_********', 'card_qty_by_********', 'ORDER_COUNT', 'sq_card_quantity', 'CREATED_AT']]
+********_df = ********_df[['QUEUE_NUMBER', '********NUMBER', '********', 'unique_pcids_by_********', 'card_qty_by_********', 'ORDER_COUNT', 'sq_card_quantity', 'CREATED_AT']]
 
 ##Create sq********.csv
 pull_string = ********
@@ -151,9 +151,9 @@ pull_result = separator.join(pull_string)
 ********_df.to_csv(pull_result, index=False)
 
 ##Parse down to single SQs in ******** dataframe
-********_df.drop_duplicates(subset=['SHIPPINGQUEUENUMBER'], inplace=True)
+********_df.drop_duplicates(subset=['********NUMBER'], inplace=True)
 
-********_df = ********_df[['QUEUE_NUMBER', 'SHIPPINGQUEUENUMBER', 'ORDER_COUNT', 'sq_card_quantity', 'CREATED_AT']]
+********_df = ********_df[['QUEUE_NUMBER', '********NUMBER', 'ORDER_COUNT', 'sq_card_quantity', 'CREATED_AT']]
 
 ##Create ********.csv
 ********_string = ********
@@ -164,17 +164,17 @@ pull_result = separator.join(pull_string)
 ##Import ******** Data
 sql_******** = ("""
 select
-    ********.core.********_pulling_agg.puller_email as puncher
-    , ********.core.********_pulling_agg.shipping_queue_number as sq
-    , ********.core.********_pulling_agg.pulling_start as pulling_start
-    , ********.core.********_pulling_agg.pulling_end as punch
-    , ********.core.********_pulling_agg.total_number_of_cards_pulled as cards_pulled
-    , ********.core.********_pulling_agg.density_pulled as density_pulled
-    , ********.core.********_pulling_agg.total_time_spent_pulling_seconds as pulling_time_seconds
-    , ********.core.********_pulling_agg.total_time_paused_seconds as paused_time_seconds
+    ********.********.********_pulling_agg.puller_email as puncher
+    , ********.********.********_pulling_agg.shipping_queue_number as sq
+    , ********.********.********_pulling_agg.pulling_start as pulling_start
+    , ********.********.********_pulling_agg.pulling_end as punch
+    , ********.********.********_pulling_agg.total_number_of_cards_pulled as cards_pulled
+    , ********.********.********_pulling_agg.density_pulled as density_pulled
+    , ********.********.********_pulling_agg.total_time_spent_pulling_seconds as pulling_time_seconds
+    , ********.********.********_pulling_agg.total_time_paused_seconds as paused_time_seconds
 
 from
-********.core.********_pulling_agg
+********.********.********_pulling_agg
 
 where
     punch::date >= cast(dateadd(dd, -120, getdate()) as date)
@@ -197,7 +197,7 @@ cursor.execute(sql_********)
 
 ##********
 ********_df["********"] = ********_df['SQ'].str[-3:]
-********_df.loc[(********_df['SQ'].map(len) == 16) & (********_df['SQ'].str[-3:] != 'poq'), '********'] = ********_df['SQ'].str[-6:]
+********_df.loc[(********_df['SQ'].map(len) == 16) & (********_df['SQ'].str[-3:] != '********'), '********'] = ********_df['SQ'].str[-6:]
 
 ##Remove patched SQs
 ********_df.loc[(********_df['DENSITY_PULLED'] == 1) & (********_df['********'] != 'sccSub') & (********_df['********'] != 'sco'), 'Puncher'] = None
@@ -218,15 +218,15 @@ gd.set_with_dataframe(ppDataTab, ********_df)
 ##Import cabinet data for ******** doc
 cab_sql = ("""
 select
-    distinct concat(direct_inventory.set_name,  '-', direct_inventory.condition) as identifier
-    , direct_inventory.set_name as set_name
-    , direct_inventory.condition as cond_name
+    distinct concat(********_inventory.set_name,  '-', ********_inventory.condition) as identifier
+    , ********_inventory.set_name as set_name
+    , ********_inventory.condition as cond_name
     , sku_hist.location_name as cabinet
     , sku_hist.physical_order as physical_order
 
 
-from ********.core.fulfillment_center_skus_location_history as sku_hist
-inner join ********.core.direct_inventory on sku_hist.product_condition_id = direct_inventory.product_condition_id
+from ********.********.********_center_skus_location_history as sku_hist
+inner join ********.********.********_inventory on sku_hist.product_condition_id = ********_inventory.product_condition_id
 
 where
     sku_hist.effective_to is null
@@ -285,27 +285,27 @@ gd.set_with_dataframe(cabTab, unique_cabs_df, row=1, col=4)
 ##Mail check in
 sql_mail = ("""
 select
-    reimbursement_invoices.reimbursement_invoice_number as package_number
-    , reimbursement_invoices.total_product_quantity as card_count
+    ********_invoices.********_invoice_number as package_number
+    , ********_invoices.total_product_quantity as card_count
     , users.email_address as user_email
-    , convert_timezone('UTC', 'America/New_York', reimorderaudit.createdat) as check_in_time
+    , convert_timezone('UTC', 'America/New_York', ********orderaudit.createdat) as check_in_time
 
     , case
-        when reimorderauditchange.originalvalue = '2' and reimorderauditchange.newvalue = '3' then 'RI - Received'
+        when ********orderauditchange.originalvalue = '2' and ********orderauditchange.newvalue = '3' then 'RI - Received'
         else null
         end as event_type
 
 from
-********.core.reimbursement_invoices
-inner join ********.********.ReimOrder on ********.********.ReimOrder.ReimOrderNumber = reimbursement_invoices.reimbursement_invoice_number
-inner join ********.adt.reimorderaudit on ********.********.ReimOrder.reimorderid = reimorderaudit.reimorderid
-inner join ********.adt.reimorderauditchange on reimorderaudit.reimorderauditid = reimorderauditchange.reimorderauditid
-inner join ********.core.users on reimorderaudit.createdbyuserid = users.id
+********.********.********_invoices
+inner join ********.********.********Order on ********.********.********Order.********OrderNumber = ********_invoices.********_invoice_number
+inner join ********.adt.********orderaudit on ********.********.********Order.********orderid = ********orderaudit.********orderid
+inner join ********.adt.********orderauditchange on ********orderaudit.********orderauditid = ********orderauditchange.********orderauditid
+inner join ********.********.users on ********orderaudit.createdbyuserid = users.id
 
 where
     cast(check_in_time as date) >= dateadd(dd, -31, getdate())
-    and reimbursement_invoices.is_auto = false
-    and reimorderauditchange.originalvalue is not null
+    and ********_invoices.is_auto = false
+    and ********orderauditchange.originalvalue is not null
     and event_type is not null
 
 """)
