@@ -30,44 +30,44 @@ snowflake_pull = connect(********)
 
 ********_gen_df = ********_gen_df.loc[********_gen_df['Date'].astype('float64') >= 240608]
 
-##Import RI Data
+##Import ******** Data
 sql_rec = ("""
 select
-    ********_invoices.********_invoice_number as ri_number
-    , ********_invoices.total_product_quantity as number_of_cards
-    , ********_invoices.processed_by_user_email as processor_email
-    , ********_invoices.processing_ended_at_et as processing_ended
-    , ********_invoices.active_processing_time_minutes as proc_time_minutes
+    ********_********s.********_********_number as ********_number
+    , ********_********s.total_product_quantity as number_of_cards
+    , ********_********s.processed_by_user_email as processor_email
+    , ********_********s.processing_ended_at_et as processing_ended
+    , ********_********s.active_processing_time_minutes as proc_time_minutes
 
-    , ********_invoices.processing_condition_discrepancy_quantity as proc_cond_count_entered
-    , ********_invoices.processing_missing_discrepancy_quantity as proc_miss_count_entered
-    , ********_invoices.processing_extra_quantity_discrepancy_quantity as proc_extra_count_entered
+    , ********_********s.processing_condition_discrepancy_quantity as proc_cond_count_entered
+    , ********_********s.processing_missing_discrepancy_quantity as proc_miss_count_entered
+    , ********_********s.processing_extra_quantity_discrepancy_quantity as proc_extra_count_entered
 
-    , ********_invoices.status as ri_status
-    , split_part(********_invoices.********_invoice_number, '-', 3) as ri_type
+    , ********_********s.status as ********_status
+    , split_part(********_********s.********_********_number, '-', 3) as ********_type
 
     , case
-        when processor_email is not null then 'RI Proc'
+        when processor_email is not null then '******** Proc'
         else null
-        end as ri_proc_********
+        end as ********_proc_********
 
-    , ********_invoice_products.product_condition_id as pcid
-    , ********_invoice_products.set_name as set_name
-    , ********_invoice_products.condition as condition_name
-    , ********_invoice_products.sku_value as price
-    , ********_invoice_products.********_level as ********_level
-    , ********_invoice_products.cabinet as cabinet
-    , ********_invoice_products.quantity_stocked as quantity_stocked
-    , ********_invoice_products.expected_quantity as expected_quantity
-    , ********_invoice_products.******** as ********
+    , ********_********_products.product_condition_id as pcid
+    , ********_********_products.set_name as set_name
+    , ********_********_products.condition as condition_name
+    , ********_********_products.sku_value as p********ce
+    , ********_********_products.********_level as ********_level
+    , ********_********_products.cabinet as cabinet
+    , ********_********_products.quantity_stocked as quantity_stocked
+    , ********_********_products.expected_quantity as expected_quantity
+    , ********_********_products.******** as ********
 
 from
-analytics.core.********_invoices
-inner join analytics.core.********_invoice_products on ********_invoices.********_invoice_number = ********_invoice_products.********_invoice_number
+********.core.********_********s
+inner join ********.core.********_********_products on ********_********s.********_********_number = ********_********_products.********_********_number
 
 where
-    ********_invoices.created_at_et::date >= cast(dateadd(dd, -120, getdate()) as date)
-    and ********_invoices.is_auto = false
+    ********_********s.created_at_et::date >= cast(dateadd(dd, -120, getdate()) as date)
+    and ********_********s.is_auto = false
 
 """)
 
@@ -75,76 +75,76 @@ cursor = snowflake_pull.cursor()
 cursor.execute(sql_rec)
 rec_df = cursor.fetch_pandas_all()
 rec_df.drop(rec_df.filter(like='Unnamed'), axis=1, inplace=True)
-rec_df.dropna(subset = ["RI_NUMBER"], inplace=True)
+rec_df.dropna(subset = ["********_NUMBER"], inplace=True)
 
 ##Fix data types
-rec_df['PRICE'] = rec_df['PRICE'].astype('float64')
+rec_df['P********CE'] = rec_df['P********CE'].astype('float64')
 
 rec_df.loc[(rec_df['********'] == "High") | (rec_df['********'] == "Medium"), '********'] = "High"
 rec_df.loc[rec_df['********'].str[:3] == 'Low', '********'] = "Low"
 
 ##Account for lanes
-rec_df["********"] = rec_df['RI_NUMBER'].str.split('-').str[2]
+rec_df["********"] = rec_df['********_NUMBER'].str.split('-').str[2]
 
-rec_df.loc[rec_df['********'].str[-3:] == "PRF", '********_LEVEL'] = "********"
-rec_df.loc[rec_df['********'].str[-4:] == "TPRF", '********_LEVEL'] = "********"
-rec_df.loc[rec_df['********'].str[-3:] == "TPR", '********_LEVEL'] = "********"
+rec_df.loc[rec_df['********'].str[-3:] == "********", '********_LEVEL'] = "********"
+rec_df.loc[rec_df['********'].str[-4:] == "********", '********_LEVEL'] = "********"
+rec_df.loc[rec_df['********'].str[-3:] == "********", '********_LEVEL'] = "********"
 
-rec_df.loc[rec_df['********'].str[-3:] == "STD", '********_LEVEL'] = "********"
-rec_df.loc[rec_df['********'].str[-4:] == "TSTD", '********_LEVEL'] = "********"
-rec_df.loc[rec_df['********'].str[-3:] == "TST", '********_LEVEL'] = "********"
+rec_df.loc[rec_df['********'].str[-3:] == "********", '********_LEVEL'] = "********"
+rec_df.loc[rec_df['********'].str[-4:] == "********", '********_LEVEL'] = "********"
+rec_df.loc[rec_df['********'].str[-3:] == "********", '********_LEVEL'] = "********"
 
 ##Sleeving
 rec_df["sleeved"] = None
 
-mtg_set_list = ['Alpha Edition', 'Beta Edition', 'Unlimited Edition', 'Legends', 'Antiquities', 'Arabian Nights', 'Collector\'s Edition', 'International Edition']
+mtg_set_list = ********
 
-pkm_set_list = ['Skyridge', 'Aquapolis', 'Expedition', 'Neo Destiny', 'Neo Revelation', 'Neo Discovery', 'Neo Genesis', 'Gym Challenge', 'Gym Heroes', 'Team Rocket', 'Base Set 2', 'Fossil', 'Jungle', 'Base Set Shadowless', 'Base Set']
-
-********
+pkm_set_list = ********
 
 ********
 
 ********
 
-##Aggragate quantity stocked, unique cards, sleeved cards and cabinet splits per RI
+********
+
+##Aggragate quantity stocked, unique cards, sleeved cards and cabinet splits per ********
 rec_df['sleeved'] = rec_df['sleeved'].astype('float64')
 
-sleeved_cards_per_ri = rec_df.groupby('RI_NUMBER')['sleeved'].sum()
-rec_df = pd.merge(rec_df, sleeved_cards_per_ri, how='right', on='RI_NUMBER')
+sleeved_cards_per_******** = rec_df.groupby('********_NUMBER')['sleeved'].sum()
+rec_df = pd.merge(rec_df, sleeved_cards_per_********, how='********ght', on='********_NUMBER')
 
-cabinet_splits = rec_df.groupby('RI_NUMBER')['CABINET'].nunique()
-rec_df = pd.merge(rec_df, cabinet_splits, how='right', on='RI_NUMBER')
+cabinet_splits = rec_df.groupby('********_NUMBER')['CABINET'].nunique()
+rec_df = pd.merge(rec_df, cabinet_splits, how='********ght', on='********_NUMBER')
 
-cabinet_splits = rec_df.groupby('RI_NUMBER')['PCID'].nunique()
-rec_df = pd.merge(rec_df, cabinet_splits, how='right', on='RI_NUMBER')
+cabinet_splits = rec_df.groupby('********_NUMBER')['PCID'].nunique()
+rec_df = pd.merge(rec_df, cabinet_splits, how='********ght', on='********_NUMBER')
 
-quantity_stocked = rec_df.groupby('RI_NUMBER')['QUANTITY_STOCKED'].sum()
-rec_df = pd.merge(rec_df, quantity_stocked, how='right', on='RI_NUMBER')
+quantity_stocked = rec_df.groupby('********_NUMBER')['QUANTITY_STOCKED'].sum()
+rec_df = pd.merge(rec_df, quantity_stocked, how='********ght', on='********_NUMBER')
 
 ********
 
-##Calculate RI Density
-rec_df["ri_density"] = rec_df['NUMBER_OF_CARDS'].astype('float64') / rec_df['unique_cards_per_ri'].astype('float64')
+##Calculate ******** Density
+rec_df["********_density"] = rec_df['NUMBER_OF_CARDS'].astype('float64') / rec_df['unique_cards_per_********'].astype('float64')
 
 ##Merge with ******** data
-********_gen_df.rename(columns={'RI':'RI_NUMBER'}, inplace=True)
+********_gen_df.rename(columns={'********':'********_NUMBER'}, inplace=True)
 
-rec_df = pd.merge(rec_df, ********_gen_df, on='RI_NUMBER', how='left')
+rec_df = pd.merge(rec_df, ********_gen_df, on='********_NUMBER', how='left')
 
 ##Parse down dataframe
 ********
 
-rec_df.dropna(subset=['RI_NUMBER'], inplace=True)
+rec_df.dropna(subset=['********_NUMBER'], inplace=True)
 
 ##Sum quantities per ******** / cabinet combo
 rec_df["count"] = rec_df['********'].astype(str) + rec_df['Cabinet'].astype(str)
 
 cards_filed_per_cabinet = rec_df.groupby('count')['per_card_quantity_stocked'].sum()
-rec_df = pd.merge(rec_df, cards_filed_per_cabinet, how='right', on='count')
+rec_df = pd.merge(rec_df, cards_filed_per_cabinet, how='********ght', on='count')
 
 unique_cards_per_cabinet = rec_df.groupby('count')['PCID'].nunique()
-rec_df = pd.merge(rec_df, unique_cards_per_cabinet, how='right', on='count')
+rec_df = pd.merge(rec_df, unique_cards_per_cabinet, how='********ght', on='count')
 
 ********
 
@@ -152,31 +152,31 @@ rec_df = pd.merge(rec_df, unique_cards_per_cabinet, how='right', on='count')
 rec_df["Density"] = rec_df['qty_stocked_per_cabinet'].astype('float64') / rec_df['unique_cards_per_cabinet'].astype('float64')
 
 ##Parse down frame
-rec_df["unique"] = rec_df['RI_NUMBER'].astype(str) + rec_df['count'].astype(str)
+rec_df["unique"] = rec_df['********_NUMBER'].astype(str) + rec_df['count'].astype(str)
 
 rec_df.drop_duplicates(subset='unique', inplace=True)
 
 ##Rec.csv
 rec_norm_df = rec_df.copy()
-rec_norm_df.drop_duplicates(subset='RI_NUMBER', inplace=True)
+rec_norm_df.drop_duplicates(subset='********_NUMBER', inplace=True)
 
 ********
 
-rec_norm_string = ********
-rec_norm_result = separator.join(rec_norm_string)
+rec_norm_st********ng = ********
+rec_norm_result = separator.join(rec_norm_st********ng)
 rec_norm_df.to_csv(rec_norm_result, index=False)
 
 ##Create ******** filing data
 ********_filing_df = rec_df.copy()
-********_filing_df.drop_duplicates(subset='RI_NUMBER', inplace=True)
-********_filing_df = ********_filing_df[['RI_NUMBER', 'NUMBER_OF_CARDS', 'per_ri_quantity_stocked', 'RI_STATUS']]
+********_filing_df.drop_duplicates(subset='********_NUMBER', inplace=True)
+********_filing_df = ********_filing_df[['********_NUMBER', 'NUMBER_OF_CARDS', 'per_********_quantity_stocked', '********_STATUS']]
 
-##Write data to doc
+##W********te data to doc
 dataTab = gc.open_by_key('********').worksheet('Data')
 dataTab.clear()
 gd.set_with_dataframe(dataTab, ********_filing_df)
 
-##Filing Time Study Data
+##Filing ******** Data
 filing_ts_df = rec_df.copy()
 
 filing_ts_df.drop_duplicates(subset=['count'], inplace=True)
@@ -185,66 +185,66 @@ filing_ts_df = filing_ts_df[['********', 'Cabinet', 'qty_stocked_per_cabinet', '
 
 filing_ts_df.rename(columns={'qty_stocked_per_cabinet':'Cards'}, inplace=True)
 
-##Write data to sheet
+##W********te data to sheet
 filing_tab = gc.open_by_key('********').worksheet('CardData')
 filing_tab.clear()
 gd.set_with_dataframe(filing_tab, filing_ts_df)
 
 ##Rec projections
 rec_proj_df = rec_df.copy()
-rec_proj_df = rec_proj_df.loc[rec_proj_df['RI_STATUS'] == "Received"]
-rec_proj_df.drop_duplicates(subset='RI_NUMBER', inplace=True)
+rec_proj_df = rec_proj_df.loc[rec_proj_df['********_STATUS'] == "Received"]
+rec_proj_df.drop_duplicates(subset='********_NUMBER', inplace=True)
 
 ##Aggragate
-cards_by_ri_type = rec_proj_df.groupby('********')['NUMBER_OF_CARDS'].sum()
-rec_proj_df = pd.merge(rec_proj_df, cards_by_ri_type, how='right', on='********')
-rec_proj_df.rename(columns={'NUMBER_OF_CARDS_y':'cards_by_ri_type', 'NUMBER_OF_CARDS_x':'NUMBER_OF_CARDS'}, inplace=True)
+cards_by_********_type = rec_proj_df.groupby('********')['NUMBER_OF_CARDS'].sum()
+rec_proj_df = pd.merge(rec_proj_df, cards_by_********_type, how='********ght', on='********')
+rec_proj_df.rename(columns={'NUMBER_OF_CARDS_y':'cards_by_********_type', 'NUMBER_OF_CARDS_x':'NUMBER_OF_CARDS'}, inplace=True)
 
 ##Aggragate by ******** combination
 rec_proj_df["********_combine"] = rec_proj_df['********'].astype(str) + rec_proj_df['********'].astype(str)
 
 cards_by_******** = rec_proj_df.groupby('********_combine')['NUMBER_OF_CARDS'].sum()
-rec_proj_df = pd.merge(rec_proj_df, cards_by_********, how='right', on='********_combine')
+rec_proj_df = pd.merge(rec_proj_df, cards_by_********, how='********ght', on='********_combine')
 rec_proj_df.rename(columns={'NUMBER_OF_CARDS_y':'cards_by_********', 'NUMBER_OF_CARDS_x':'NUMBER_OF_CARDS'}, inplace=True)
 
-##Count RIs by ******** combination
-ris_by_********_comb = rec_proj_df.groupby('********_combine')['RI_NUMBER'].nunique()
-rec_proj_df = pd.merge(rec_proj_df, ris_by_********_comb, how='right', on='********_combine')
-rec_proj_df.rename(columns={'RI_NUMBER_x':'RI_NUMBER', 'RI_NUMBER_y':'unique_ris_by_********_comb'}, inplace=True)
+##Count ********s by ******** combination
+********s_by_********_comb = rec_proj_df.groupby('********_combine')['********_NUMBER'].nunique()
+rec_proj_df = pd.merge(rec_proj_df, ********s_by_********_comb, how='********ght', on='********_combine')
+rec_proj_df.rename(columns={'********_NUMBER_x':'********_NUMBER', '********_NUMBER_y':'unique_********s_by_********_comb'}, inplace=True)
 
 ##Total cards by ******** level
-ris_by_******** = rec_proj_df.groupby('********')['RI_NUMBER'].nunique()
-rec_proj_df = pd.merge(rec_proj_df, ris_by_********, how='right', on='********')
-rec_proj_df.rename(columns={'RI_NUMBER_x':'RI_NUMBER', 'RI_NUMBER_y':'unique_ris_by_********'}, inplace=True)
+********s_by_******** = rec_proj_df.groupby('********')['********_NUMBER'].nunique()
+rec_proj_df = pd.merge(rec_proj_df, ********s_by_********, how='********ght', on='********')
+rec_proj_df.rename(columns={'********_NUMBER_x':'********_NUMBER', '********_NUMBER_y':'unique_********s_by_********'}, inplace=True)
 
 ##High/Low Ratio
-rec_proj_df["High to Low Ratio"] = rec_proj_df['unique_ris_by_********_comb'].astype('float64') / rec_proj_df['unique_ris_by_********'].astype('float64')
+rec_proj_df["High to Low Ratio"] = rec_proj_df['unique_********s_by_********_comb'].astype('float64') / rec_proj_df['unique_********s_by_********'].astype('float64')
 
 rec_proj_df.drop_duplicates(subset='********_combine', inplace=True)
 
 ##Rearrange data
-rec_proj_df = rec_proj_df[['********', '********', 'cards_by_ri_type', 'cards_by_********', 'unique_ris_by_********', 'unique_ris_by_********_comb', 'High to Low Ratio']]
+rec_proj_df = rec_proj_df[['********', '********', 'cards_by_********_type', 'cards_by_********', 'unique_********s_by_********', 'unique_********s_by_********_comb', 'High to Low Ratio']]
 
 rec_proj_high_df = rec_proj_df.copy()
 rec_proj_high_df = rec_proj_high_df.loc[rec_proj_high_df['********'] == "High"]
-rec_proj_high_df.rename(columns={'cards_by_********':'High Card Count', 'unique_ris_by_********_comb':'High Count'}, inplace=True)
+rec_proj_high_df.rename(columns={'cards_by_********':'High Card Count', 'unique_********s_by_********_comb':'High Count'}, inplace=True)
 
 rec_proj_df = rec_proj_df.loc[rec_proj_df['********'] == "Low"]
-rec_proj_df.rename(columns={'cards_by_********':'Low Card Count', 'unique_ris_by_********_comb':'Low Count'}, inplace=True)
+rec_proj_df.rename(columns={'cards_by_********':'Low Card Count', 'unique_********s_by_********_comb':'Low Count'}, inplace=True)
 
 rec_proj_df = pd.merge(rec_proj_df, rec_proj_high_df, how='outer', on='********')
 
-rec_proj_df.rename(columns={'cards_by_ri_type_x':'Total Cards', 'unique_ris_by_********_x':'Total RIs', 'High to Low Ratio_y':'High to Low Ratio'}, inplace=True)
+rec_proj_df.rename(columns={'cards_by_********_type_x':'Total Cards', 'unique_********s_by_********_x':'Total ********s', 'High to Low Ratio_y':'High to Low Ratio'}, inplace=True)
 
 ********
 
-##Write data to sheet
-recProjTab = gc.open_by_key('********').worksheet('BacklogData')
+##W********te data to sheet
+recProjTab = gc.open_by_key('********').worksheet('********')
 recProjTab.batch_clear(['A1:H6'])
 gd.set_with_dataframe(recProjTab, rec_proj_df, row=1, col=1)
 
 ##Yest proc data
-rec_df.drop_duplicates(subset='RI_NUMBER', inplace=True)
+rec_df.drop_duplicates(subset='********_NUMBER', inplace=True)
 
 rec_df = rec_df.loc[rec_df['PROC_TIME_MINUTES'].astype('float64') > 0]
 
@@ -257,27 +257,27 @@ rec_df = rec_df.loc[rec_df['PROCESSING_ENDED'] == (rec_df['now'] - timedelta(day
 
 ##Sum cards processed yesterday
 total_cards = rec_df.groupby('********')['NUMBER_OF_CARDS'].sum()
-rec_df = pd.merge(rec_df, total_cards, how='right', on='********')
+rec_df = pd.merge(rec_df, total_cards, how='********ght', on='********')
 rec_df.drop('NUMBER_OF_CARDS_x', axis=1, inplace=True)
 rec_df.rename(columns={'NUMBER_OF_CARDS_y':'Total Cards'}, inplace=True)
 rec_df.drop_duplicates(subset='********', inplace=True)
 rec_df = rec_df[['********', 'Total Cards']]
 
-##Write data to sheet
+##W********te data to sheet
 dataTab = gc.open_by_key('********').worksheet('YestProc')
 dataTab.clear()
 gd.set_with_dataframe(dataTab, rec_df)
 
 ##Update audit log
-csv_string = ********
-result = separator.join(csv_string)
+csv_st********ng = ********
+result = separator.join(csv_st********ng)
 audit_df = pd.read_csv(result)
 
 executionTime = (time.time() - startTime)
-dt_string = datetime.now(pytz.timezone('America/New_York')).strftime("%m/%d/%Y %H:%M:%S")
-script_name = os.path.basename(__file__).replace('.py', '')
+dt_st********ng = datetime.now(pytz.timezone('Ame********ca/New_York')).strftime("%m/%d/%Y %H:%M:%S")
+sc********pt_name = os.path.basename(__file__).replace('.py', '')
 
-new_audit = {'Timestamp': dt_string, 'Execution Time': executionTime, 'Script': script_name}
+new_audit = {'Timestamp': dt_st********ng, 'Execution Time': executionTime, 'Sc********pt': sc********pt_name}
 
 new_audit_df = pd.DataFrame(data=new_audit, index=[0])
 
