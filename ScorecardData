@@ -1,0 +1,1366 @@
+import gspread
+import pandas as pd
+import gspread_dataframe as gd
+from datetime import datetime, timedelta
+import datetime as dt
+import time
+import os
+import numpy as np
+import pytz
+import datetime as dt
+
+login = os.getlogin()
+separator = '\\'
+startTime = time.time()
+
+gc=gspread.service_account()
+
+####Data import module
+##Import Staffing Data
+staffing = gc.open_by_key(********).worksheet('Current Staff')
+staffing_df = pd.DataFrame.from_dict(staffing.get_all_records())
+staffing_df = staffing_df[[********]]
+#staffing_df.rename(columns={********}, inplace=True)
+staffing_df['Email'] = staffing_df['Email'].str.lower()
+staffing_df.rename(columns={'Email':'Puncher'}, inplace=True)
+staffing_df[********] = staffing_df[********].as********(str)
+
+******** = gc.open_by_key(********).worksheet('********')
+********_df = pd.DataFrame.from_dict(********.get_all_records())
+********_df.dropna(subset=[********], inplace=True)
+********_df.rename(columns={********:'Preferred Name'}, inplace=True)
+********_df[********] = ********_df[********].as********(str)
+
+********_df = pd.merge(********_df, staffing_df, how='left', on=********)
+********_df = ********_df[[********, 'Former Email', 'Preferred Name_x', '********', 'Shift Length', 'Start Date', 'Supervisor', 'OPs Lead', 'Last, First (Formatting)']]
+********_df.rename(columns={'Former Email':'Puncher', 'Preferred Name_x':'Preferred Name'}, inplace=True)
+staffing_df = pd.concat([staffing_df, ********_df])
+
+staffing_df[********] = staffing_df[********].as********(str)
+staffing_df['Puncher'] = staffing_df['Puncher'].str.lower()
+
+###Import Shift Data
+shift = gc.open_by_key(********).worksheet('FilteredData')
+shiftdata_df = pd.DataFrame.from_dict(shift.get_all_records())
+
+shiftdata_df = s********
+shiftdata_df['Date'] = pd.to_datetime(shiftdata_df['Date']).dt.date
+
+shiftdata_df = shiftdata_df.loc[(shiftdata_df['********'] != '-') & (shiftdata_df['********'].as********('float64') > 0)]
+shiftdata_df['Primary Email'] = shiftdata_df['Primary Email'].str.lower()
+shiftdata_df["combined"] = shiftdata_df['Date'].as********(str) + shiftdata_df['Primary Email'].as********(str)
+
+shiftdata_df['********'] = shiftdata_df['********'].as********(str)
+
+##Only look at the last 100 days
+shiftdata_df['Date'] = pd.to_datetime(shiftdata_df['Date']).dt.date
+shiftdata_df["now"] = pd.Timestamp.now()
+shiftdata_df = shiftdata_df.loc[shiftdata_df['Date'] >= (shiftdata_df['now'].dt.date - timedelta(days = 100))]
+
+##Adjusted Shift Length
+shiftdata_df["********"] = shiftdata_df['********'].as********('float64') - 1 - (shiftdata_df['********'].as********('float64')/0.2/60)
+
+shiftdata_df.loc[(shiftdata_df['********'].as********('float64') < 4) & ((shiftdata_df['********'].as********('float64') - 0.5) < 2), '********'] = shiftdata_df['********'] + 1
+
+shiftdata_df.loc[(shiftdata_df['********'].as********('float64') < 4) & ((shiftdata_df['********'].as********('float64') - 0.5) >= 2), '********'] = shiftdata_df['********'] + 0.5
+
+##Determine time interval to search for punches
+shiftdata_df['Date'] = pd.to_datetime(shiftdata_df['Date'])
+shiftdata_df["minimum"] = ""
+shiftdata_df["maximum"] = ""
+
+shiftdata_df.loc[shiftdata_df['Role'] == ********, 'minimum'] = shiftdata_df['Date'] - timedelta(hours = 9)
+shiftdata_df.loc[shiftdata_df['Role'] == ********, 'maximum'] = shiftdata_df['Date'] + timedelta(hours = 9)
+
+shiftdata_df.loc[shiftdata_df['Role'] != ********, 'minimum'] = shiftdata_df['Date']
+shiftdata_df.loc[shiftdata_df['Role'] != ********, 'maximum'] = shiftdata_df['Date'] + timedelta(hours = 24) - timedelta(seconds = 1)
+
+#shiftdata_df.rename(columns = {'Primary Email':'Email'}, inplace=True)
+shiftdata_df.rename(columns = {'Primary Email':'Puncher'}, inplace=True)
+shiftdata_df['minimum'] = pd.to_datetime(shiftdata_df['minimum'])
+shiftdata_df['maximum'] = pd.to_datetime(shiftdata_df['maximum'])
+
+###Import Standards
+standards = gc.open_by_key('********).worksheet('Current')
+#standards = gc.open_by_key(********).worksheet('Upcoming')
+standards_df = pd.DataFrame.from_dict(standards.get_all_records())
+
+standards_df.loc[standards_df['Y-Int'] == '', 'Y-Int'] = 0
+standards_df.loc[standards_df['Coeff 1'] == '', 'Coeff 1'] = 0
+standards_df.loc[standards_df['Coeff 2'] == '', 'Coeff 2'] = 0
+standards_df.loc[standards_df['Coeff 3'] == '', 'Coeff 3'] = 0
+standards_df.loc[standards_df['Coeff 4'] == '', 'Coeff 4'] = 0
+standards_df.loc[standards_df['Coeff 5'] == '', 'Coeff 5'] = 0
+standards_df.loc[standards_df['Coeff 6'] == '', 'Coeff 6'] = 0
+
+###Define ******** Settings
+for i in range(len(standards_df)):
+if standards_df.iloc[i, 0] == ********:
+if standards_df.iloc[i, 1] == ********:
+******** = standards_df.iloc[i, 2]
+elif standards_df.iloc[i, 1] == ********:
+******** = standards_df.iloc[i, 2]
+
+********
+********
+
+###Import ******** Archive Data
+********_tab = gc.open_by_key(********).worksheet('Data')
+
+********_df = pd.DataFrame.from_dict(********_tab.get_all_records())
+********_df.replace(',', '', regex=True, inplace=True)
+********_df['Data'] = ********_df['Data'].str.lower()
+
+********_df["Punch"] = ********_df['Data'].str.split('|').str[0]
+********_df["Puncher"] = ********_df['Data'].str.split('|').str[1]
+********_df["Task"] = ********_df['Data'].str.split('|').str[2]
+********_df["Subtask"] = ********_df['Data'].str.split('|').str[3]
+********_df["Units"] = ********_df['Data'].str.split('|').str[4]
+********_df["Coeff 1 Units"] = ********_df['Data'].str.split('|').str[5]
+********_df["Coeff 2 Units"] = ********_df['Data'].str.split('|').str[6]
+********_df["Coeff 3 Units"] = ********_df['Data'].str.split('|').str[7]
+********_df["Coeff 4 Units"] = ********_df['Data'].str.split('|').str[8]
+********_df["Coeff 5 Units"] = ********_df['Data'].str.split('|').str[9]
+********_df["Test"] = ********_df['Data'].str.split('|').str[10]
+********_df["Notes"] = ********_df['Data'].str.split('|').str[11]
+********_df["******** Run"] = ********_df['Data'].str.split('|').str[12]
+********_df["******** Run"] = ********_df['Data'].str.split('|').str[13]
+********_df["Orders Completed"] = ********_df['Data'].str.split('|').str[15]
+
+********_df.loc[********_df['******** Run'].str[:4] == '********', '******** Run'] = ********_df['******** Run'].str[-1:]
+********_df.loc[********_df['******** Run'].str[:4] == '********', '******** Run'] = ********_df['******** Run'].str[-1:]
+
+********_df.drop('Data', axis=1, inplace=True)
+
+********_df['Puncher'] = ********_df['Puncher'].as********(str)
+
+##Merge Staffing Data
+********_staffing_df = staffing_df.copy()
+********_staffing_df.drop_duplicates(subset=['********'], inplace=True)
+********_df = pd.merge(********_df, ********_staffing_df, left_on='Puncher', right_on='********')
+
+********_df.rename(columns={'Puncher_y':'Puncher'}, inplace=True)
+********_df.drop(['Puncher_x'], axis=1, inplace=True)
+
+##Include current team members
+********_df = ********_df.loc[********_df['Shift Length'].apply(pd.to_numeric, errors='coerce') > 0]
+
+##Clean SQ Number column
+********_df["QUEUE_NUMBER"] = ********_df['Subtask']
+********_df.loc[(********_df['Subtask'].str[-3:] != '********') & ((********_df['Task'] == '********')  | (********_df['Task'] == 'pulling') | (********_df['Task'] == '********')), 'QUEUE_NUMBER'] = ********_df['Subtask'].str[:-3]
+
+##Create Error Dataframe
+error_df = pd.DataFrame(columns = ['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe'])
+
+###Import Receiving Data
+rec_df = pd.read_csv(separator.join(["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "Snowflake", "Rec.csv"]))
+
+##Fix data ********s
+rec_df['PROC_MISS_COUNT_ENTERED'] = rec_df['PROC_MISS_COUNT_ENTERED'].as********('float64')
+rec_df['PROC_COND_COUNT_ENTERED'] = rec_df['PROC_COND_COUNT_ENTERED'].as********('float64')
+rec_df['PROC_EXTRA_COUNT_ENTERED'] = rec_df['PROC_EXTRA_COUNT_ENTERED'].as********('float64')
+rec_df['sleeved_cards'] = rec_df['sleeved_cards'].as********('float64')
+rec_df['cabinet_splits'] = rec_df['cabinet_splits'].as********('float64')
+rec_df['ri_density'] = rec_df['ri_density'].as********('float64')
+
+###Import ******** SQ Data
+********_sql_df = pd.read_csv(separator.join(["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "Snowflake", "********.csv"]))
+
+##Fix data ********s
+********_sql_df['ORDER_COUNT'] = ********_sql_df['ORDER_COUNT'].as********('float64')
+********_sql_df['sq_card_quantity'] = ********_sql_df['sq_card_quantity'].as********('float64')
+********_sql_df['QUEUE_NUMBER'] = ********_sql_df['QUEUE_NUMBER'].str.lower()
+********_sql_df['SHIPPINGQUEUENUMBER'] = ********_sql_df['SHIPPINGQUEUENUMBER'].str.lower()
+
+##Make dataframe copies
+********_df = ********_sql_df.copy()
+********_df = ********_sql_df.copy()
+
+###Import SQ ******** Data
+sq_********_df = ********
+
+##Fix data ********s
+sq_********_df['unique_pcids_by_********'] = sq_********_df['unique_pcids_by_********'].as********('float64')
+sq_********_df['card_qty_by_********'] = sq_********_df['card_qty_by_********'].as********('float64')
+
+##Make dataframe copies
+********_********_df = sq_********_df.copy()
+********_df = sq_********_df.copy()
+pull_df = sq_********_df.copy()
+
+##Import ******** Data
+********_df = ********
+
+##Fix data ********s
+********_df['CARDS_PULLED'] = ********_df['CARDS_PULLED'].as********('float64')
+********_df['DENSITY_PULLED'] = ********_df['DENSITY_PULLED'].as********('float64')
+
+###******** Pulling
+##Connect staffing data
+********_df['PUNCHER'] = ********_df['PUNCHER'].str.lower()
+********_df.rename(columns={'PUNCHER':'Puncher', 'PUNCH':'Punch', 'DENSITY_PULLED':'Density'}, inplace=True)
+********_df['Density'] = ********_df['Density'].as********('float64')
+********_df = pd.merge(********_df, staffing_df, how='left', on='Puncher')
+
+##Include current team members
+********_df = ********_df.loc[********_df['Shift Length'].apply(pd.to_numeric, errors='coerce') > 0]
+
+##Prepare frame for merge
+********_df["Task"] = "******** Pull"
+
+##Remove duplicates
+********_df["combined"] = ********_df['Puncher'].as********(str) + "~" + ********_df['SQ'].as********(str) + "~" + ********_df['CARDS_PULLED'].as********(str)
+
+********_dupes_df = ********_df[********_df.duplicated(subset=['combined'], keep=False)]
+
+********_df.drop_duplicates(subset=['combined'], inplace=True)
+********_df.drop('combined', axis=1, inplace=True)
+
+##Merge shift data
+********_df = pd.merge(********_df, shiftdata_df, how='left', on='********')
+
+********_df = ********_df.loc[(********_df['Punch'] >= ********_df['minimum']) & (********_df['Punch'] <= ********_df['maximum'])]
+
+##********
+********_df.rename(columns={'Date':'********'}, inplace=True)
+********_df['********'] = pd.to_datetime(********_df['********'], format='%m-%d-%Y').dt.date
+
+##Define ******** pull standards
+********_pull_standards_df = standards_df.loc[standards_df.Task == '******** Pull']
+
+##SQ ********
+********_df["sq_********"] = ********_df['SQ'].str[-3:]
+********_df.loc[(********_df['SQ'].map(len) == 16) & (********_df['SQ'].str[-3:] != '********'), 'sq_********'] = ********_df['SQ'].str[-6:]
+
+##Merge standard with dataframe
+********_df = pd.merge(********_df, ********_pull_standards_df, left_on = 'sq_********', right_on = 'Subtask')
+
+##Calculate metrics
+********_df["********_********"] = ""
+
+********_df.loc[********_df['Y-Int Def'] == 'SPC', '********_********'] = (********_df['CARDS_PULLED'].as********('float64')) / ((3600 / (********_df['Y-Int'].as********('float64') + (********_df['Density'].as********('float64') * ********_df['Coeff 1'].as********('float64')))) * ********_df['********'].as********('float64'))
+
+********_df.loc[********_df['Y-Int Def'] == 'CPH', '********_********'] = (********_df['CARDS_PULLED'].as********('float64')) / ((********_df['Y-Int'].as********('float64') + (********_df['Density'].as********('float64') * ********_df['Coeff 1'].as********('float64'))) * ********_df['********'].as********('float64'))
+
+##Write final dataframe
+********_df["Test"] = ""
+********_df["Notes"] = ""
+
+********_df = ********_df[['Punch','********','Preferred Name','CARDS_PULLED','SQ','********_********','Task_x','********','********','********']]
+
+********_df.rename(columns={'Preferred Name':'Puncher','SQ':'Subtask','********_********':'********', 'Task_x':'Task', 'CARDS_PULLED':'Units'},inplace=True)
+
+###******** Module
+##Make ******** ******** dataframe and ******** sq data frame
+********_********_df = ********_df.copy()
+********_********_df = ********_********_df.loc[(********_********_df['Task'] == '********') & (********_********_df['Subtask'].str[-3:] != '********')]
+
+##Find dupes
+********_********_df["Dupe"] = ********_********_df['Punch'].as********(str) + ********_********_df['Puncher'].as********(str) + ********_********_df['Subtask'].as********(str)
+
+********_dupe_df = ********_********_df.copy()
+********_dupe_df = ********_dupe_df[********_dupe_df.duplicated(subset=['Dupe'], keep=False)]
+********_dupe_df.drop_duplicates(subset=['Dupe'], inplace=True)
+********_dupe_df.loc[********_dupe_df['Dupe'] != '', 'Dupe'] = "Error"
+********_dupe_df = ********_dupe_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe']]
+
+error_df = pd.concat([error_df, ********_dupe_df])
+
+********_********_df.drop_duplicates(subset=['Dupe'], inplace=True)
+
+##Merge remaining data with SQ data and account for ********s
+********_df = pd.merge(********_df, ********_********_df, how='right', on='QUEUE_NUMBER')
+********_df.loc[********_df['QUEUE_NUMBER'].str[-3:] == '********', 'SHIPPINGQUEUENUMBER'] = ********_df['QUEUE_NUMBER']
+
+##Find punches with bad sq number data
+********_********or_df = ********_df.copy()
+********_********or_df = ********_********or_df.loc[********_df['SHIPPINGQUEUENUMBER'].isna()]
+********_********or_df['SHIPPINGQUEUENUMBER'] = ********_********or_df['SHIPPINGQUEUENUMBER'].fillna("Error")
+********_********or_df.drop('Subtask', axis=1, inplace=True)
+********_********or_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask'}, inplace=True)
+********_********or_df = ********_********or_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_********or_df])
+
+********_df = ********_df.loc[********_df['SHIPPINGQUEUENUMBER'].notna()]
+
+##Find ******** with no orders completed
+********_df['Orders Completed'] = ********_df['Orders Completed'].apply(pd.to_numeric, errors='coerce')
+********_orders_error_df = ********_df.loc[(********_df['Subtask'].str[-3:] == 'tak') & (********_df['Orders Completed'] == '')]
+********_orders_error_df.loc[********_orders_error_df['Orders Completed'] == '', 'Orders Completed'] = "Error"
+********_orders_error_df = ********_orders_error_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_orders_error_df])
+
+********_df.loc[(********_df['Orders Completed'] == '') & (********_df['Subtask'].str[-3:] == 'tak'), 'Punch'] = None
+
+##Find sqs that don't exist
+********_df['ORDER_COUNT'] = ********_df['ORDER_COUNT'].apply(pd.to_numeric, errors='coerce').fillna(0)
+********_na_error_df = ********_df.loc[********_df['ORDER_COUNT'] == 0]
+********_na_error_df.loc[********_na_error_df['ORDER_COUNT'] == 0, 'Subtask'] = "Error"
+********_na_error_df = ********_na_error_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_na_error_df])
+
+********_df = ********_df.loc[********_df['ORDER_COUNT'] > 0]
+
+##Normalize punches
+********_df["normal_punch"] = pd.to_datetime(********_df['Punch']).dt.date
+
+##Merge shift data
+********_df = pd.merge(********_df, shiftdata_df, how='left', on='********')
+********_df = ********_df.loc[(********_df['Punch'] >= ********_df['minimum']) & (********_df['Punch'] <= ********_df['maximum'])]
+********_df.drop(['Puncher_x', 'Puncher_y'], axis=1, inplace=True)
+
+##********
+********_df.rename(columns={'Date':'********', 'Preferred Name':'Puncher'}, inplace=True)
+********_df['********'] = pd.to_datetime(********_df['********'], format='%m-%d-%Y').dt.date
+
+##Split ********
+********_df.drop('Units', axis=1, inplace=True)
+********_df["Units"] = ********_df['sq_card_quantity']
+
+********_df.loc[(********_df['Subtask'].str[-3:] == 'tak') & (pd.isnull(********_df['Orders Completed']) == True), 'Orders Completed'] = ********_df['ORDER_COUNT'].as********('float64') / 2
+
+********_df.loc[********_df['Subtask'].str[-3:] == 'tak', 'Units'] = np.ceil(********_df['sq_card_quantity'].as********('float64') * (********_df['Orders Completed'].as********('float64') / ********_df['ORDER_COUNT'].as********('float64')))
+
+##SQ ********
+********_df["sq_********"] = ********_df['SHIPPINGQUEUENUMBER'].str[-3:]
+********_df.loc[(********_df['SHIPPINGQUEUENUMBER'].map(len) == 16) & (********_df['SHIPPINGQUEUENUMBER'].str[-3:] != '********'), 'sq_********'] = ********_df['SHIPPINGQUEUENUMBER'].str[-6:]
+
+##Define ******** standards
+********_standards_df = standards_df.copy()
+********_standards_df = ********_standards_df.loc[********_standards_df['Task'] == '********']
+********_standards_df["combined"] = ********_standards_df['Task'].as********(str) + ********_standards_df['Subtask'].as********(str)
+********_standards_df["combined"] = ********_standards_df['combined'].str.lower()
+
+********_df["combined"] = ********_df['Task'].as********(str) + ********_df['sq_********'].as********(str)
+
+********_df = pd.merge(********_df, ********_standards_df, left_on='combined', right_on='combined')
+
+********_df.drop(list(********_df.filter(regex="_y")), axis=1, inplace=True)
+********_df.columns = [col.replace("_x", "")if "_x" in col else col for col in ********_df.columns]
+
+##Aggragate errors
+#********_df["total_errors"] = ********_df['Coeff 1 Units'].apply(pd.to_numeric, errors='coerce') + ********_df['Coeff 2 Units'].apply(pd.to_numeric, errors='coerce') + ********_df['Coeff 3 Units'].apply(pd.to_numeric, errors='coerce') + ********_df['Coeff 4 Units'].apply(pd.to_numeric, errors='coerce') + ********_df['Coeff 5 Units'].apply(pd.to_numeric, errors='coerce')
+
+##Calculate Metrics
+********_df = ********_df.loc[(********_df['********'].as********('float64') > 0) & (********_df['********'] != 0)]
+
+********_df["Coeff 1 Units"] = ********_df['ORDER_COUNT']
+********_df["Coeff 2 Units"] = 0
+********_df["Coeff 3 Units"] = 0
+********_df["Coeff 4 Units"] = 0
+********_df["Coeff 5 Units"] = 0
+********_df["Coeff 6 Units"] = 0
+
+********_df.loc[********_df['Y-Int Def'] == 'CPH', '********'] = ********_df['Units'].as********('int64') / ((********_df['Y-Int'].as********('float64') +
+(********_df['Coeff 1 Units'].as********('float64') * ********_df['Coeff 1'].as********('float64')) +
+(********_df['Coeff 2 Units'].as********('float64') * ********_df['Coeff 2'].as********('float64')) +
+(********_df['Coeff 3 Units'].as********('float64') * ********_df['Coeff 3'].as********('float64')) +
+(********_df['Coeff 4 Units'].as********('float64') * ********_df['Coeff 4'].as********('float64')) +
+(********_df['Coeff 5 Units'].as********('float64') * ********_df['Coeff 5'].as********('float64')) +
+(********_df['Coeff 6 Units'].as********('float64') * ********_df['Coeff 6'].as********('float64'))
+) * ********_df['********'].as********('float64'))
+
+********_df.loc[********_df['Y-Int Def'] == 'SPC', '********'] = ********_df['Units'].as********('int64') / (( 3600 / (********_df['Y-Int'].as********('float64') +
+(********_df['Coeff 1 Units'].as********('float64') * ********_df['Coeff 1'].as********('float64')) +
+(********_df['Coeff 2 Units'].as********('float64') * ********_df['Coeff 2'].as********('float64')) +
+(********_df['Coeff 3 Units'].as********('float64') * ********_df['Coeff 3'].as********('float64')) +
+(********_df['Coeff 4 Units'].as********('float64') * ********_df['Coeff 4'].as********('float64')) +
+(********_df['Coeff 5 Units'].as********('float64') * ********_df['Coeff 5'].as********('float64')) +
+(********_df['Coeff 6 Units'].as********('float64') * ********_df['Coeff 6'].as********('float64'))
+)) * ********_df['********'].as********('float64'))
+
+##Create final dataframe
+********_df.loc[(********_df['Task'] != '') & (********_df['Subtask'].str[-3:] == 'tak'), 'Task'] = "******** ********"
+********_df.loc[(********_df['Task'] != '') & (********_df['Subtask'].str[-3:] != 'tak'), 'Task'] = "********"
+********_df.drop('Subtask', axis=1, inplace=True)
+
+********_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask', 'ORDER_COUNT':'Orders'}, inplace=True)
+
+********_df = ********_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********','Test','Notes','Orders']]
+
+###******** ******** Module
+##Make ******** ******** ******** dataframe, merge with sq data
+********_********_********_df = ********_df.loc[(********_df['Task'] == '********') & (********_df['Subtask'].str[-3:] == '********')]
+
+##Merge remaining data with SQ data
+********_********_df = pd.merge(********_********_df, ********_********_********_df, how='right', on='QUEUE_NUMBER')
+
+##Find dupes
+********_********_df["Dupe"] = ********_********_df['********'].as********(str) + ********_********_df['******** Run'].as********(str) + ********_********_df['******** Run'].as********(str) + ********_********_df['Puncher'].as********(str) + ********_********_df['Subtask'].as********(str) + ********_********_df['******** Run'].as********(str) + ********_********_df['******** Run'].as********(str)
+
+********_********_dupe_df = ********_********_df.copy()
+********_********_dupe_df = ********_********_dupe_df[********_********_dupe_df.duplicated(subset=['Dupe'], keep=False)]
+********_********_dupe_df.drop('Dupe', axis=1, inplace=True)
+********_********_dupe_df["Dupe"] = ********_********_dupe_df['******** Run'].as********(str) + ********_********_dupe_df['******** Run'].as********(str) + ********_********_dupe_df['Puncher'].as********(str) + ********_********_dupe_df['Subtask'].as********(str) + ********_********_dupe_df['******** Run'].as********(str) + ********_********_dupe_df['******** Run'].as********(str)
+********_********_dupe_df.drop_duplicates(subset=['Dupe'], inplace=True)
+
+********_********_dupe_df.loc[********_********_dupe_df['Dupe'] != '', 'Dupe'] = "Error"
+
+********_********_dupe_df = ********_********_dupe_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe']]
+
+error_df = pd.concat([error_df, ********_********_dupe_df])
+
+********_********_df = ********_********_df.drop_duplicates(subset=['Dupe'])
+
+##Find punches with bad sq number data
+********_********_********or_df = ********_********_df.copy()
+********_********_********or_df = ********_********_********or_df[********_********_********or_df['SHIPPINGQUEUENUMBER'].isna()]
+********_********_********or_df['SHIPPINGQUEUENUMBER'] = ********_********_********or_df['SHIPPINGQUEUENUMBER'].fillna("Error")
+********_********_********or_df.drop('Subtask', axis=1, inplace=True)
+********_********_********or_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask'}, inplace=True)
+********_********_********or_df = ********_********_********or_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_********_********or_df])
+
+##Remove SQs without ******** data or bad sq number data
+********_********_df.loc[********_********_df['******** Run'] == '', '******** Run'] = None
+********_********_df.loc[********_********_df['******** Run'] == '', '******** Run'] = None
+
+********_********_error_df = ********_********_df.copy()
+********_********_error_df = ********_********_error_df[(********_********_error_df['SHIPPINGQUEUENUMBER'].isna()) | (********_********_error_df['******** Run'].isna()) | (********_********_error_df['******** Run'].isna())]
+
+********_********_error_df['********_full_sq_number'] = ********_********_error_df['SHIPPINGQUEUENUMBER'].fillna("Error")
+********_********_error_df['******** Run'] = ********_********_error_df['******** Run'].fillna("Error")
+********_********_error_df['******** Run'] = ********_********_error_df['******** Run'].fillna("Error")
+********_********_error_df.drop('Subtask', axis=1, inplace=True)
+********_********_error_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask'}, inplace=True)
+
+********_********_error_df["********_combined"] = ********_********_error_df['Punch'].as********(str) + ********_********_error_df['Puncher'].as********(str) + ********_********_error_df['Subtask'].as********(str)
+********_********_error_df = ********_********_error_df.drop_duplicates(subset=['********_combined'])
+
+********_********_error_df = ********_********_error_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_********_error_df])
+
+##Remove errors from dataframe
+********_********_df.dropna(subset=['SHIPPINGQUEUENUMBER', '******** Run', '******** Run'], inplace=True)
+
+##Normalize punches
+********_********_df["normal_punch"] = pd.to_datetime(********_********_df['Punch']).dt.date
+
+##Merge shift data
+********_********_df = pd.merge(********_********_df, shiftdata_df, how='left', on='********')
+********_********_df = ********_********_df.loc[(********_********_df['Punch'] >= ********_********_df['minimum']) & (********_********_df['Punch'] <= ********_********_df['maximum'])]
+********_********_df.drop(['Puncher_x', 'Puncher_y'], axis=1, inplace=True)
+
+##******** and fix columns
+********_********_df.drop(['Units'], axis=1, inplace=True)
+********_********_df.rename(columns={'Date':'********', 'Preferred Name':'Puncher', 'card_qty_by_********':'Units'}, inplace=True)
+********_********_df['********'] = pd.to_datetime(********_********_df['********'], format='%m-%d-%Y').dt.date
+
+##Deal with ******** ********s
+********_********_df.loc[********_********_df['******** Run'] != '', '******** Run'] = ********_********_df['******** Run'].str.strip().apply(ord) - 96
+********_********_df.loc[********_********_df['******** Run'] != '', '******** Run'] = ********_********_df['******** Run'].str.strip().apply(ord) - 96
+
+********_********_df["********d_quantity"] = 0
+********_********_df['Units'] = ********_********_df['Units'].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+********_********_df.loc[(********_********_df['********'].apply(pd.to_numeric, errors='coerce').fillna(0) >= ********_********_df['******** Run'].apply(pd.to_numeric, errors='coerce').fillna(0)) & (********_********_df['********'].apply(pd.to_numeric, errors='coerce').fillna(0) <= ********_********_df['******** Run'].apply(pd.to_numeric, errors='coerce').fillna(0)), '********d_quantity'] = ********_********_df['Units']
+
+********_********_df["********_combined"] = ********_********_df['Punch'].as********(str) + ********_********_df['Puncher'].as********(str) + ********_********_df['SHIPPINGQUEUENUMBER'].as********(str)
+
+********d_quantity_agg = ********_********_df.groupby('********_combined')['********d_quantity'].sum()
+********_********_df = pd.merge(********_********_df, ********d_quantity_agg, how='right', on='********_combined')
+
+********_********_df = ********_********_df.drop_duplicates(subset=['********_combined'])
+********_********_df.drop(['********_combined', 'Units', '********d_quantity_x'], axis=1, inplace=True)
+
+********_********_df.rename(columns={'********d_quantity_y': '********d_quantity'}, inplace=True)
+
+##Define ******** ******** standards
+********_********_standards_df = standards_df.copy()
+********_********_standards_df = ********_********_standards_df.loc[********_********_standards_df['Task'] == '********']
+
+##Merge Standards with Dataframe
+********_********_standards_df['Subtask'] = ********_********_standards_df['Subtask'].str.lower()
+
+********_********_df["sq_********"] = ********_********_df['SHIPPINGQUEUENUMBER'].str[-6:].str.lower()
+********_********_df['SHIPPINGQUEUENUMBER'] = ********_********_df['SHIPPINGQUEUENUMBER'].str.lower()
+********_********_df.loc[********_********_df['SHIPPINGQUEUENUMBER'].map(len) == 13, 'sq_********'] = ********_********_df['SHIPPINGQUEUENUMBER'].str[-3:]
+
+********_********_df = pd.merge(********_********_df, ********_********_standards_df, left_on='sq_********', right_on='Subtask')
+
+********_********_df.drop(list(********_********_df.filter(regex="_y")), axis=1, inplace=True)
+********_********_df.columns = [col.replace("_x", "")if "_x" in col else col for col in ********_********_df.columns]
+********_********_df.drop(['Subtask'], axis=1, inplace=True)
+
+##Aggragate errors
+#********_********_df["total_errors"] = ********_********_df['Coeff 1 Units'].apply(pd.to_numeric, errors='coerce') + ********_********_df['Coeff 2 Units'].apply(pd.to_numeric, errors='coerce') + ********_********_df['Coeff 3 Units'].apply(pd.to_numeric, errors='coerce') + ********_********_df['Coeff 4 Units'].apply(pd.to_numeric, errors='coerce') + ********_********_df['Coeff 5 Units'].apply(pd.to_numeric, errors='coerce')
+
+##Calculate Metrics
+********_********_df = ********_********_df.loc[(********_********_df['********'].as********('float64') > 0) & (********_********_df['********'] != 0)]
+
+********_********_df["Units"] = ********_********_df['********d_quantity']
+
+********_********_df["Coeff 1 Units"] = ********_********_df['********d_quantity']
+********_********_df["Coeff 2 Units"] = 0
+********_********_df["Coeff 3 Units"] = 0
+********_********_df["Coeff 4 Units"] = 0
+********_********_df["Coeff 5 Units"] = 0
+********_********_df["Coeff 6 Units"] = 0
+
+********_********_df.loc[********_********_df['Y-Int Def'] == 'CPH', '********'] = ********_********_df['Units'].as********('int64') / ((********_********_df['Y-Int'].as********('float64') +
+(********_********_df['Coeff 1 Units'].as********('float64') * ********_********_df['Coeff 1'].as********('float64')) +
+(********_********_df['Coeff 2 Units'].as********('float64') * ********_********_df['Coeff 2'].as********('float64')) +
+(********_********_df['Coeff 3 Units'].as********('float64') * ********_********_df['Coeff 3'].as********('float64')) +
+(********_********_df['Coeff 4 Units'].as********('float64') * ********_********_df['Coeff 4'].as********('float64')) +
+(********_********_df['Coeff 5 Units'].as********('float64') * ********_********_df['Coeff 5'].as********('float64')) +
+(********_********_df['Coeff 6 Units'].as********('float64') * ********_********_df['Coeff 6'].as********('float64'))
+) * ********_********_df['********'])
+
+********_********_df.loc[********_********_df['Y-Int Def'] == 'SPC', '********'] = ********_********_df['Units'].as********('int64') / (( 3600 / (********_********_df['Y-Int'].as********('float64') +
+(********_********_df['Coeff 1 Units'].as********('float64') * ********_********_df['Coeff 1'].as********('float64')) +
+(********_********_df['Coeff 2 Units'].as********('float64') * ********_********_df['Coeff 2'].as********('float64')) +
+(********_********_df['Coeff 3 Units'].as********('float64') * ********_********_df['Coeff 3'].as********('float64')) +
+(********_********_df['Coeff 4 Units'].as********('float64') * ********_********_df['Coeff 4'].as********('float64')) +
+(********_********_df['Coeff 5 Units'].as********('float64') * ********_********_df['Coeff 5'].as********('float64')) +
+(********_********_df['Coeff 6 Units'].as********('float64') * ********_********_df['Coeff 6'].as********('float64'))
+)) * ********_********_df['********'])
+
+##Create final dataframe
+********_********_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask', '********d_quantity':'Orders'}, inplace=True)
+
+********_********_df['Task'] = "********"
+
+********_********_df = ********_********_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********','Test','Notes','Orders']]
+
+###******** Module
+##Make pull ******** ******** dataframe
+********_********_df = ********_df.copy()
+********_********_df = ********_********_df.loc[********_********_df.Task == '********']
+
+##Find dupes
+********_********_df["Dupe"] = ********_********_df['Puncher'].as********(str) + ********_********_df['Subtask'].as********(str) + ********_********_df['******** Run'].as********(str) + ********_********_df['******** Run'].as********(str)
+
+********_dupe_df = ********_********_df.copy()
+********_dupe_df = ********_dupe_df[********_dupe_df.duplicated(subset=['Dupe'], keep=False)]
+********_dupe_df.drop_duplicates(subset=['Dupe'], inplace=True)
+********_dupe_df.loc[********_dupe_df['Dupe'] != '', 'Dupe'] = "Error"
+********_dupe_df = ********_dupe_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe']]
+
+error_df = pd.concat([error_df, ********_dupe_df])
+
+##Merge remaining data with SQ data and account for ********s
+********_df = pd.merge(********_df, ********_********_df, how='right', on='QUEUE_NUMBER')
+********_df.loc[********_df['QUEUE_NUMBER'].str[-3:] == '********', 'SHIPPINGQUEUENUMBER'] = ********_df['QUEUE_NUMBER']
+
+##Find punches with bad sq number data and punches missing ******** data
+********_df.loc[********_df['******** Run'] == '', '******** Run'] = None
+********_df.loc[********_df['******** Run'] == '', '******** Run'] = None
+
+********_********or_df = ********_df.copy()
+********_********or_df = ********_********or_df[(********_********or_df['SHIPPINGQUEUENUMBER'].isna()) | (********_********or_df['******** Run'].isna()) | (********_********or_df['******** Run'].isna())]
+
+********_********or_df['SHIPPINGQUEUENUMBER'] = ********_********or_df['SHIPPINGQUEUENUMBER'].fillna("Error")
+********_********or_df.drop('Subtask', axis=1, inplace=True)
+********_********or_df['******** Run'] = ********_********or_df['******** Run'].fillna("Error")
+********_********or_df['******** Run'] = ********_********or_df['******** Run'].fillna("Error")
+********_********or_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask'}, inplace=True)
+********_********or_df.drop_duplicates(subset=['Dupe'], inplace=True)
+
+********_********or_df = ********_********or_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_********or_df])
+
+##Remove errors from dataframe
+********_df.dropna(subset=["SHIPPINGQUEUENUMBER", "******** Run", "******** Run"], inplace=True)
+
+##Normalize punches
+********_df["normal_punch"] = pd.to_datetime(********_df['Punch']).dt.date
+
+##Merge shift data
+********_df = pd.merge(********_df, shiftdata_df, how='left', on='********')
+********_df = ********_df.loc[(********_df['Punch'] >= ********_df['minimum']) & (********_df['Punch'] <= ********_df['maximum'])]
+********_df.drop(['Puncher_x', 'Puncher_y'], axis=1, inplace=True)
+
+##******** and fix columns
+********_df['Date'] = pd.to_datetime(********_df['Date'], format='%m-%d-%Y').dt.date
+********_df.drop(['Units'], axis=1, inplace=True)
+********_df.rename(columns={'card_qty_by_********':'Units', 'Preferred Name': 'Puncher', 'Date':'********'}, inplace=True)
+
+##Deal with ********s
+********_df.loc[(********_df['******** Run'] != '') & (********_df['Subtask'].str[-3:] != 'roc'), '******** Run'] = ********_df['******** Run'].str.strip().apply(ord) - 96
+********_df.loc[(********_df['******** Run'] != '') & (********_df['Subtask'].str[-3:] != 'roc'), '******** Run'] = ********_df['******** Run'].str.strip().apply(ord) - 96
+
+##Remove ********s/pcids not ********ified and aggregate
+********_df["********ified_quantity"] = 0
+
+********_df['Units'] = ********_df['Units'].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+********_df = ********_df.loc[********_df['********'].apply(pd.to_numeric, errors='coerce') != 0]
+
+********_df.loc[(********_df['********'].apply(pd.to_numeric, errors='coerce').fillna(0) >= ********_df['******** Run'].apply(pd.to_numeric, errors='coerce').fillna(0)) & (********_df['********'].apply(pd.to_numeric, errors='coerce').fillna(0) <= ********_df['******** Run'].apply(pd.to_numeric, errors='coerce').fillna(0)), '********ified_quantity'] = ********_df['Units']
+
+********_df["********_combined"] = ********_df['Punch'].as********(str) + ********_df['Puncher'].as********(str) + ********_df['SHIPPINGQUEUENUMBER'].as********(str)
+
+********ified_quantity_agg = ********_df.groupby('********_combined')['********ified_quantity'].sum()
+********_df = pd.merge(********_df, ********ified_quantity_agg, how='right', on='********_combined')
+
+********_df = ********_df.drop_duplicates(subset=['********_combined'])
+
+##Sum pull ******** ********
+********_df["total_errors"] = ********_df['Coeff 1 Units'].apply(pd.to_numeric, errors='coerce').fillna(0) + ********_df['Coeff 2 Units'].apply(pd.to_numeric, errors='coerce').fillna(0) + ********_df['Coeff 3 Units'].apply(pd.to_numeric, errors='coerce').fillna(0) + ********_df['Coeff 4 Units'].apply(pd.to_numeric, errors='coerce').fillna(0) + ********_df['Coeff 5 Units'].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+##Define pull ******** standards
+********_standards_df = standards_df.loc[standards_df.Task == 'Pull ********']
+
+##Merge pull ******** standards with dataframe
+********_df['Task'] = 'Pull ********'
+********_df = pd.merge(********_df, ********_standards_df, left_on = "Task", right_on = "Task")
+
+##Calculate Metrics
+********_df.drop('Units', axis=1, inplace=True)
+********_df = ********_df.loc[(********_df['********'].as********('float64') > 0) & (********_df['********'] != 0)]
+
+********_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask', '********ified_quantity_y':'Units'}, inplace=True)
+
+********_df["Coeff 1 Units"] = ********_df['total_errors']
+********_df["Coeff 2 Units"] = 0
+********_df["Coeff 3 Units"] = 0
+********_df["Coeff 4 Units"] = 0
+********_df["Coeff 5 Units"] = 0
+********_df["Coeff 6 Units"] = 0
+
+********_df.loc[********_df['Y-Int Def'] == 'CPH', '********'] = ********_df['Units'].as********('int64') / ((********_df['Y-Int'].as********('float64') +
+(********_df['Coeff 1 Units'].as********('float64') * ********_df['Coeff 1'].as********('float64')) +
+(********_df['Coeff 2 Units'].as********('float64') * ********_df['Coeff 2'].as********('float64')) +
+(********_df['Coeff 3 Units'].as********('float64') * ********_df['Coeff 3'].as********('float64')) +
+(********_df['Coeff 4 Units'].as********('float64') * ********_df['Coeff 4'].as********('float64')) +
+(********_df['Coeff 5 Units'].as********('float64') * ********_df['Coeff 5'].as********('float64')) +
+(********_df['Coeff 6 Units'].as********('float64') * ********_df['Coeff 6'].as********('float64'))
+) * ********_df['********'])
+
+********_df.loc[********_df['Y-Int Def'] == 'SPC', '********'] = ********_df['Units'].as********('int64') / (( 3600 / (********_df['Y-Int'].as********('float64') +
+(********_df['Coeff 1 Units'].as********('float64') * ********_df['Coeff 1'].as********('float64')) +
+(********_df['Coeff 2 Units'].as********('float64') * ********_df['Coeff 2'].as********('float64')) +
+(********_df['Coeff 3 Units'].as********('float64') * ********_df['Coeff 3'].as********('float64')) +
+(********_df['Coeff 4 Units'].as********('float64') * ********_df['Coeff 4'].as********('float64')) +
+(********_df['Coeff 5 Units'].as********('float64') * ********_df['Coeff 5'].as********('float64')) +
+(********_df['Coeff 6 Units'].as********('float64') * ********_df['Coeff 6'].as********('float64'))
+)) * ********_df['********'])
+
+##Create final dataframe
+********_df = ********_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********','Test','Notes']]
+
+###Pulling Module
+##Make pull ******** dataframe, merge wuth ******** dataframe
+pull_********_df = ********_df.copy()
+pull_********_df = ********_df.loc[********_df.Task == 'pulling']
+
+##Find dupes
+pull_dupe_df = pull_********_df.copy()
+pull_dupe_df["Dupe"] = pull_dupe_df['Puncher'].as********(str) + pull_dupe_df['Subtask'].as********(str) + pull_dupe_df['******** Run'].as********(str) + pull_dupe_df['******** Run'].as********(str)
+pull_dupe_df = pull_dupe_df[pull_dupe_df.duplicated(subset=['Dupe'], keep=False)]
+pull_dupe_df.drop_duplicates(subset=['Dupe'], inplace=True)
+pull_dupe_df.loc[pull_dupe_df['Dupe'] != '', 'Dupe'] = "Error"
+pull_dupe_df = pull_dupe_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe']]
+
+error_df = pd.concat([error_df, pull_dupe_df])
+
+##Merge remaining data with SQ data and account for ********s
+pull_df = pd.merge(pull_df, pull_********_df, how='right', on='QUEUE_NUMBER')
+pull_df.loc[pull_df['QUEUE_NUMBER'].str[-3:] == '********', 'SHIPPINGQUEUENUMBER'] = pull_df['QUEUE_NUMBER']
+
+##Remove punches with bad sq number data and punches missing ******** data
+pull_df.loc[pull_df['******** Run'] == '', '******** Run'] = None
+pull_df.loc[pull_df['******** Run'] == '', '******** Run'] = None
+
+pull_********or_df = pull_df.copy()
+pull_********or_df = pull_********or_df[(pull_********or_df['SHIPPINGQUEUENUMBER'].isna()) | (pull_********or_df['******** Run'].isna()) | (pull_********or_df['******** Run'].isna())]
+pull_********or_df['SHIPPINGQUEUENUMBER'] = pull_********or_df['SHIPPINGQUEUENUMBER'].fillna("Error")
+
+pull_********or_df.drop('Subtask', axis=1, inplace=True)
+pull_********or_df['******** Run'] = pull_********or_df['******** Run'].fillna("Error")
+pull_********or_df['******** Run'] = pull_********or_df['******** Run'].fillna("Error")
+pull_********or_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask'}, inplace=True)
+
+pull_********or_df = pull_********or_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, pull_********or_df])
+
+##Remove errors from dataframe
+pull_df.dropna(subset=["SHIPPINGQUEUENUMBER", "******** Run", "******** Run"], inplace=True)
+
+##Normalize punches
+pull_df["normal_punch"] = pd.to_datetime(pull_df['Punch']).dt.date
+
+##Merge shift data
+pull_df = pd.merge(pull_df, shiftdata_df, how='left', on='********')
+pull_df = pull_df.loc[(pull_df['Punch'] >= pull_df['minimum']) & (pull_df['Punch'] <= pull_df['maximum'])]
+pull_df.drop(['Puncher_x', 'Puncher_y'], axis=1, inplace=True)
+
+##********
+pull_df.drop(['Units'], axis=1, inplace=True)
+pull_df.rename(columns={'Date':'********', 'card_qty_by_********':'Units', 'Preferred Name':'Puncher'}, inplace=True)
+pull_df['********'] = pd.to_datetime(pull_df['********'], format='%m-%d-%Y').dt.date
+
+##Deal with ********s
+pull_df.loc[(pull_df['******** Run'] != '') & (pull_df['Subtask'].str[-3:] != 'roc'), '******** Run'] = pull_df['******** Run'].str.strip().apply(ord) - 96
+pull_df.loc[(pull_df['******** Run'] != '') & (pull_df['Subtask'].str[-3:] != 'roc'), '******** Run'] = pull_df['******** Run'].str.strip().apply(ord) - 96
+
+##Remove ********s/pcids not pulled and aggregate
+pull_df["pulled_quantity"] = ""
+pull_df["pulled_pcids"] = ""
+
+pull_df = pull_df.loc[pull_df['********'] != '']
+
+pull_df.loc[(pull_df['********'].apply(pd.to_numeric, errors='coerce').fillna(0) >= pull_df['******** Run'].apply(pd.to_numeric, errors='coerce').fillna(0)) & (pull_df['********'].apply(pd.to_numeric, errors='coerce').fillna(0) <= pull_df['******** Run'].apply(pd.to_numeric, errors='coerce').fillna(0)), 'pulled_quantity'] = pull_df['Units']
+
+pull_df.loc[(pull_df['********'].apply(pd.to_numeric, errors='coerce').fillna(0) >= pull_df['******** Run'].apply(pd.to_numeric, errors='coerce').fillna(0)) & (pull_df['********'].apply(pd.to_numeric, errors='coerce').fillna(0) <= pull_df['******** Run'].apply(pd.to_numeric, errors='coerce').fillna(0)), 'pulled_pcids'] = pull_df['unique_pcids_by_********']
+
+pull_df['pulled_quantity'] = pull_df['pulled_quantity'].apply(pd.to_numeric, errors='coerce').fillna(0)
+pull_df['pulled_pcids'] = pull_df['pulled_pcids'].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+pull_df["pull_combined"] = pull_df['Punch'].as********(str) + pull_df['Puncher'].as********(str) + pull_df['SHIPPINGQUEUENUMBER'].as********(str)
+
+pulled_quantity_agg = pull_df.groupby('pull_combined')['pulled_quantity'].sum()
+pull_df = pd.merge(pull_df, pulled_quantity_agg, how='right', on='pull_combined')
+
+pulled_pcids_agg = pull_df.groupby('pull_combined')['pulled_pcids'].sum()
+pull_df = pd.merge(pull_df, pulled_pcids_agg, how='right', on='pull_combined')
+
+pull_df = pull_df.drop_duplicates(subset=['pull_combined'])
+
+pull_df.rename(columns={'pulled_quantity_y': 'pulled_quantity', 'pulled_pcids_y': 'pulled_pcids'}, inplace=True)
+
+pull_df = pull_df.loc[pull_df['pulled_pcids'] != 0]
+
+##Calculate density of cards pulled
+pull_df["pulled_density"] = pull_df['pulled_quantity'] / pull_df['pulled_pcids']
+
+##Define pull standards
+pull_standards_df = standards_df.copy()
+pull_standards_df = pull_standards_df.loc[pull_standards_df['Task'] == 'Pull']
+
+##Merge pull standards with dataframe
+pull_df["sq_********"] = pull_df['SHIPPINGQUEUENUMBER'].str[-3:]
+pull_df.loc[(pull_df['SHIPPINGQUEUENUMBER'].map(len) == 16) & (pull_df['SHIPPINGQUEUENUMBER'].str[-3:] != '********'), 'sq_********'] = pull_df['SHIPPINGQUEUENUMBER'].str[-6:]
+
+pull_df = pd.merge(pull_df, pull_standards_df, left_on = "sq_********", right_on = "Subtask")
+
+##Calculate Metrics
+pull_df.drop('Units', axis=1, inplace=True)
+pull_df = pull_df.loc[(pull_df['********'].as********('float64') > 0) & (pull_df['********'] != 0)]
+
+pull_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask', 'Task_y':'Task', 'pulled_quantity':'Units'}, inplace=True)
+
+pull_df["Coeff 1 Units"] = pull_df['pulled_density']
+pull_df["Coeff 2 Units"] = 0
+pull_df["Coeff 3 Units"] = 0
+pull_df["Coeff 4 Units"] = 0
+pull_df["Coeff 5 Units"] = 0
+pull_df["Coeff 6 Units"] = 0
+
+pull_df.loc[pull_df['Y-Int Def'] == 'CPH', '********'] = pull_df['Units'].as********('int64') / ((pull_df['Y-Int'].as********('float64') +
+(pull_df['Coeff 1 Units'].as********('float64') * pull_df['Coeff 1'].as********('float64')) +
+(pull_df['Coeff 2 Units'].as********('float64') * pull_df['Coeff 2'].as********('float64')) +
+(pull_df['Coeff 3 Units'].as********('float64') * pull_df['Coeff 3'].as********('float64')) +
+(pull_df['Coeff 4 Units'].as********('float64') * pull_df['Coeff 4'].as********('float64')) +
+(pull_df['Coeff 5 Units'].as********('float64') * pull_df['Coeff 5'].as********('float64')) +
+(pull_df['Coeff 6 Units'].as********('float64') * pull_df['Coeff 6'].as********('float64'))
+) * pull_df['********'])
+
+pull_df.loc[pull_df['Y-Int Def'] == 'SPC', '********'] = pull_df['Units'].as********('int64') / (( 3600 / (pull_df['Y-Int'].as********('float64') +
+(pull_df['Coeff 1 Units'].as********('float64') * pull_df['Coeff 1'].as********('float64')) +
+(pull_df['Coeff 2 Units'].as********('float64') * pull_df['Coeff 2'].as********('float64')) +
+(pull_df['Coeff 3 Units'].as********('float64') * pull_df['Coeff 3'].as********('float64')) +
+(pull_df['Coeff 4 Units'].as********('float64') * pull_df['Coeff 4'].as********('float64')) +
+(pull_df['Coeff 5 Units'].as********('float64') * pull_df['Coeff 5'].as********('float64')) +
+(pull_df['Coeff 6 Units'].as********('float64') * pull_df['Coeff 6'].as********('float64'))
+)) * pull_df['********'])
+
+##Create final dataframe
+pull_df = pull_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********','Test','Notes']]
+
+###Gen Tasks Module
+##Make gen ******** dataframe
+gen_df = ********_df.copy()
+gen_df = gen_df.loc[gen_df['Task'] == '********']
+
+##Normalize punches
+gen_df["normal_punch"] = pd.to_datetime(gen_df['Punch']).dt.date
+
+##Merge shift data
+gen_df = pd.merge(gen_df, shiftdata_df, how='left', on='********')
+gen_df = gen_df.loc[(gen_df['Punch'] >= gen_df['minimum']) & (gen_df['Punch'] <= gen_df['maximum'])]
+
+##********
+gen_df.rename(columns={'Date':'********'}, inplace=True)
+gen_df['********'] = pd.to_datetime(gen_df['********'], format='%m-%d-%Y').dt.date
+
+##Define gen standards
+gen_standards_df = standards_df.copy()
+gen_standards_df = gen_standards_df.loc[gen_standards_df['Task'] == '********']
+gen_standards_df['Subtask'] = gen_standards_df['Subtask'].str.lower()
+gen_df = pd.merge(gen_df, gen_standards_df, left_on='Subtask', right_on='Subtask')
+
+gen_df.drop(list(gen_df.filter(regex="_y")), axis=1, inplace=True)
+
+new_columns = [col.replace("_x", "")if "_x" in col else col for col in gen_df.columns]
+gen_df.columns = new_columns
+gen_df.drop('FALSE', axis=1, inplace=True)
+
+##Determine gen ********
+gen_df["gen_********"] = ""
+
+gen_df['Minutes ********'] = gen_df['Minutes ********'].apply(pd.to_numeric, errors='coerce').fillna('None')
+gen_df.loc[gen_df['Units'] != None, 'gen_********'] = gen_df['Units']
+gen_df.loc[gen_df['Minutes ********'] != 'None', 'gen_********'] = gen_df['Minutes ********']
+
+##Remove punches with no gen ********
+gen_nc_df = gen_df.copy()
+gen_nc_df = gen_nc_df.loc[gen_nc_df['gen_********'] == '']
+gen_nc_df.loc[gen_nc_df['gen_********'] == '', 'gen_********'] = None
+
+gen_nc_df['Units'] = gen_nc_df['Units'].fillna("Error")
+
+gen_nc_df = gen_nc_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, gen_nc_df])
+
+gen_df = gen_df.loc[gen_df['gen_********'] != '']
+
+##Find gen dupes
+gen_df["Dupe"] = gen_df['Punch'].as********(str) + gen_df['Puncher'].as********(str) + gen_df['Subtask'].as********(str) + gen_df['Units'].as********(str)
+gen_dupe_df = gen_df.copy()
+
+gen_dupe_df = gen_dupe_df[gen_dupe_df.duplicated(subset=['Dupe'], keep=False)]
+gen_dupe_df.drop_duplicates(subset=['Dupe'], inplace=True)
+gen_dupe_df.loc[gen_dupe_df['Dupe'] != '', 'Dupe'] = "Error"
+
+gen_dupe_df = gen_dupe_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe']]
+
+error_df = pd.concat([error_df, gen_dupe_df])
+
+gen_df = gen_df.drop_duplicates(subset=['Dupe'])
+
+##Calculate gen metrics
+gen_df = gen_df.loc[pd.to_numeric(gen_df['********'].as********('float64'), errors='coerce') > 0]
+
+gen_df["********"] = (gen_df['gen_********'].as********('float64') / 60) / gen_df['********'].as********('float64')
+
+##Prepare dataframe for final write and create final dataframe
+gen_df.drop('Puncher', axis=1, inplace=True)
+gen_df.rename(columns={'Preferred Name':'Puncher'}, inplace=True)
+gen_df['Task'] = "********"
+
+gen_df = gen_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********','Test','Notes']]
+
+gen_df["dupe"] = gen_df['Punch'].as********(str) + gen_df['Puncher'].as********(str) + gen_df['Subtask'].as********(str) + gen_df['Units'].as********(str)
+gen_df.drop_duplicates(subset=['dupe'], inplace=True)
+gen_df.drop('dupe', axis=1, inplace=True)
+
+###Filing Module
+##Build filing dataframe
+filing_df = ********_df.copy()
+filing_df = filing_df.loc[filing_df.Task == 'filing']
+
+##Find dupes
+filing_df["Dupe"] = filing_df['Punch'].as********(str) + filing_df['Puncher'].as********(str) + filing_df['Units'].as********(str)
+
+filing_dupe_df = filing_df.copy()
+filing_dupe_df = filing_dupe_df[filing_dupe_df.duplicated(subset=['Dupe'], keep=False)]
+filing_dupe_df.drop_duplicates(subset=['Dupe'], inplace=True)
+filing_dupe_df.loc[filing_dupe_df['Dupe'] != '', 'Dupe'] = "Error"
+filing_dupe_df = filing_dupe_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe']]
+
+error_df = pd.concat([error_df, filing_dupe_df])
+
+##Find non numerical filing data
+filing_df['Units'] = filing_df['Units'].apply(pd.to_numeric, errors='coerce')
+filing_cards_error_df = filing_df.copy()
+filing_cards_error_df = filing_cards_error_df[filing_cards_error_df['Units'].isna()]
+filing_cards_error_df['Units'] = filing_cards_error_df['Units'].fillna("Error")
+
+filing_cards_error_df = filing_cards_error_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, filing_cards_error_df])
+
+##Remove errors from dataframe
+filing_df.drop_duplicates(subset='Dupe', inplace=True)
+filing_df.dropna(subset=["Units"], inplace=True)
+
+##Normalize punches
+filing_df["normal_punch"] = pd.to_datetime(filing_df['Punch']).dt.date
+
+##Merge shift data
+filing_df = pd.merge(filing_df, shiftdata_df, how='left', on='********')
+filing_df = filing_df.loc[(filing_df['Punch'] >= filing_df['minimum']) & (filing_df['Punch'] <= filing_df['maximum'])]
+filing_df.drop(['Puncher_x', 'Puncher_y'], axis=1, inplace=True)
+
+##********
+filing_df.rename(columns={'Date':'********'}, inplace=True)
+filing_df['********'] = pd.to_datetime(filing_df['********'], format='%m-%d-%Y').dt.date
+
+##Define ********s for RI filing runs
+filing_df["ri_********"] = "********"
+
+filing_df.loc[(filing_df['Units'] <= float(********)) & (filing_df['Subtask'] == 'ris'), 'ri_********'] = "********"
+filing_df.loc[(filing_df['Units'] > float(********)) & (filing_df['Subtask'] == 'ris'), 'ri_********'] = "********"
+filing_df.loc[filing_df['Subtask'] != 'ris', 'ri_********'] = "-"
+
+filing_df["Combined"] = filing_df['Subtask'].as********(str) + filing_df['ri_********'].as********(str)
+
+##Build filing standards dataframe
+filing_standards_df = standards_df.copy()
+filing_standards_df = filing_standards_df.loc[filing_standards_df['Task'] == 'Filing']
+filing_standards_df['Subtask'] = filing_standards_df['Subtask'].str.lower()
+filing_standards_df["Combined"] = filing_standards_df['Subtask'].as********(str) + filing_standards_df['********'].as********(str)
+
+##Merge Standards with Dataframe
+filing_df = pd.merge(filing_df, filing_standards_df, left_on = "Combined", right_on = "Combined")
+
+##Calculate Metrics
+filing_df = filing_df.loc[(filing_df['********'].as********('float64') > 0) & (filing_df['********'] != 0)]
+
+filing_df["Coeff 1 Units"] = filing_df['Units']
+filing_df["Coeff 2 Units"] = 0
+filing_df["Coeff 3 Units"] = 0
+filing_df["Coeff 4 Units"] = 0
+filing_df["Coeff 5 Units"] = 0
+filing_df["Coeff 6 Units"] = 0
+
+filing_df.loc[filing_df['Y-Int Def'] == 'CPH', '********'] = filing_df['Units'].as********('int64') / ((filing_df['Y-Int'].as********('float64') +
+(filing_df['Coeff 1 Units'].as********('float64') * filing_df['Coeff 1'].as********('float64')) +
+(filing_df['Coeff 2 Units'].as********('float64') * filing_df['Coeff 2'].as********('float64')) +
+(filing_df['Coeff 3 Units'].as********('float64') * filing_df['Coeff 3'].as********('float64')) +
+(filing_df['Coeff 4 Units'].as********('float64') * filing_df['Coeff 4'].as********('float64')) +
+(filing_df['Coeff 5 Units'].as********('float64') * filing_df['Coeff 5'].as********('float64')) +
+(filing_df['Coeff 6 Units'].as********('float64') * filing_df['Coeff 6'].as********('float64'))
+) * filing_df['********'])
+
+filing_df.loc[filing_df['Y-Int Def'] == 'SPC', '********'] = filing_df['Units'].as********('int64') / (( 3600 / (filing_df['Y-Int'].as********('float64') +
+(filing_df['Coeff 1 Units'].as********('float64') * filing_df['Coeff 1'].as********('float64')) +
+(filing_df['Coeff 2 Units'].as********('float64') * filing_df['Coeff 2'].as********('float64')) +
+(filing_df['Coeff 3 Units'].as********('float64') * filing_df['Coeff 3'].as********('float64')) +
+(filing_df['Coeff 4 Units'].as********('float64') * filing_df['Coeff 4'].as********('float64')) +
+(filing_df['Coeff 5 Units'].as********('float64') * filing_df['Coeff 5'].as********('float64')) +
+(filing_df['Coeff 6 Units'].as********('float64') * filing_df['Coeff 6'].as********('float64'))
+)) * filing_df['********'])
+
+##Create final dataframe
+filing_df.drop(['Task_x'], axis=1, inplace=True)
+filing_df.rename(columns={'Preferred Name':'Puncher', 'Subtask_y':'Subtask', 'Task_y':'Task'}, inplace=True)
+
+filing_df.loc[filing_df['Subtask'] == 'ris', 'Subtask'] = 'RIs'
+filing_df.loc[filing_df['Subtask'] == '********', 'Subtask'] = '********'
+filing_df.loc[filing_df['Subtask'] == '********', 'Subtask'] = '********'
+
+filing_df = filing_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********','Test','Notes']]
+
+###******** Module
+##Build ******** dataframe
+********_df = ********_df.copy()
+********_df = ********_df.loc[********_df['Task'] == '******** proc']
+
+##Find dupes
+********_df["Dupe"] = ********_df['Punch'].as********(str) + ********_df['Puncher'].as********(str) + ********_df['Units'].as********(str)
+
+********_dupe_df = ********_df[********_df.duplicated(subset=['Dupe'], keep=False)]
+********_dupe_df.drop_duplicates(subset=['Dupe'], inplace=True)
+********_dupe_df.loc[********_dupe_df['Dupe'] != '', 'Dupe'] = "Error"
+********_dupe_df = ********_dupe_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe']]
+
+error_df = pd.concat([error_df, ********_dupe_df])
+
+##Find non numerical ******** data
+********_df['Units'] = ********_df['Units'].apply(pd.to_numeric, errors='coerce')
+********_cards_error_df = ********_df.copy()
+********_cards_error_df = ********_cards_error_df[********_cards_error_df['Units'].isna()]
+
+********_cards_error_df['Units'] = ********_cards_error_df['Units'].fillna("Error")
+
+********_cards_error_df = ********_cards_error_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_cards_error_df])
+
+##Remove errors from dataframe
+********_df.dropna(subset=["Units"], inplace=True)
+
+##Normalize punches
+********_df["normal_punch"] = pd.to_datetime(********_df['Punch']).dt.date
+
+##Define ******** proc ********s
+********_df["********_********"] = "********"
+********_df.loc[********_df['Units'] <= ********, '********_********'] = "********"
+********_df.loc[********_df['Units'] > ********, '********_********'] = "********"
+
+##Merge shift data
+********_df = pd.merge(********_df, shiftdata_df, how='left', on='********')
+********_df = ********_df.loc[(********_df['Punch'] >= ********_df['minimum']) & (********_df['Punch'] <= ********_df['maximum'])]
+********_df.drop(['Puncher_x', 'Puncher_y'], axis=1, inplace=True)
+
+##********
+********_df.rename(columns={'Date':'********'}, inplace=True)
+********_df['********'] = pd.to_datetime(********_df['********'], format='%m-%d-%Y').dt.date
+
+##Build ******** standards dataframe
+********_standards_df = standards_df.copy()
+********_standards_df = ********_standards_df.loc[********_standards_df['Task'] == '********']
+
+##Merge Standards with Dataframe
+********_standards_df['Subtask'] = ********_standards_df['Subtask'].str.lower()
+********_df = pd.merge(********_df, ********_standards_df, left_on = "********_********", right_on = "********")
+
+##Calculate Metrics
+********_df = ********_df.loc[(********_df['********'].as********('float64') > 0) & (********_df['********'] != 0)]
+
+********_df['Coeff 1 Units'] = ********_df['Units']
+********_df['Coeff 2 Units'] = 0
+********_df['Coeff 3 Units'] = 0
+********_df['Coeff 4 Units'] = 0
+********_df['Coeff 5 Units'] = 0
+********_df['Coeff 6 Units'] = 0
+
+********_df.loc[********_df['Y-Int Def'] == 'CPH', '********'] = ********_df['Units'].as********('int64') / ((********_df['Y-Int'].as********('float64') +
+(********_df['Coeff 1 Units'].as********('float64') * ********_df['Coeff 1'].as********('float64')) +
+(********_df['Coeff 2 Units'].as********('float64') * ********_df['Coeff 2'].as********('float64')) +
+(********_df['Coeff 3 Units'].as********('float64') * ********_df['Coeff 3'].as********('float64')) +
+(********_df['Coeff 4 Units'].as********('float64') * ********_df['Coeff 4'].as********('float64')) +
+(********_df['Coeff 5 Units'].as********('float64') * ********_df['Coeff 5'].as********('float64')) +
+(********_df['Coeff 6 Units'].as********('float64') * ********_df['Coeff 6'].as********('float64'))
+) * ********_df['********'])
+
+********_df.loc[********_df['Y-Int Def'] == 'SPC', '********'] = ********_df['Units'].as********('int64') / (( 3600 / (********_df['Y-Int'].as********('float64') +
+(********_df['Coeff 1 Units'].as********('float64') * ********_df['Coeff 1'].as********('float64')) +
+(********_df['Coeff 2 Units'].as********('float64') * ********_df['Coeff 2'].as********('float64')) +
+(********_df['Coeff 3 Units'].as********('float64') * ********_df['Coeff 3'].as********('float64')) +
+(********_df['Coeff 4 Units'].as********('float64') * ********_df['Coeff 4'].as********('float64')) +
+(********_df['Coeff 5 Units'].as********('float64') * ********_df['Coeff 5'].as********('float64')) +
+(********_df['Coeff 6 Units'].as********('float64') * ********_df['Coeff 6'].as********('float64'))
+)) * ********_df['********'])
+
+##Create final dataframe
+********_df.rename(columns={'Preferred Name':'Puncher','Task_y':'Task', 'Subtask_y':'Subtask'}, inplace=True)
+
+********_df['Subtask'] = "******** Proc"
+
+********_df = ********_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********','Test','Notes']]
+
+###SQ ******** Module
+##Build ******** dataframe
+sq_********_df = ********_df.copy()
+sq_********_df = sq_********_df.loc[sq_********_df['Task'] == 'sq ********']
+
+********_df = ********_sql_df.copy()
+
+##Find dupes
+sq_********_df["Dupe"] = sq_********_df['Punch'].as********(str) + sq_********_df['Puncher'].as********(str) + sq_********_df['Subtask'].as********(str)
+
+sq_********_dupe_df = sq_********_df.copy()
+sq_********_dupe_df = sq_********_dupe_df[sq_********_dupe_df.duplicated(subset=['Dupe'], keep=False)]
+sq_********_dupe_df.drop_duplicates(subset=['Dupe'], inplace=True)
+sq_********_dupe_df.loc[sq_********_dupe_df['Dupe'] != '', 'Dupe'] = "Error"
+sq_********_dupe_df = sq_********_dupe_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run', 'Dupe']]
+
+error_df = pd.concat([error_df, sq_********_dupe_df])
+
+sq_********_df.drop_duplicates(subset=['Dupe'], inplace=True)
+
+##Merge remaining data with SQ data and account for ********s
+********_df = pd.merge(********_df, sq_********_df, how='right', on='QUEUE_NUMBER')
+
+********_df.loc[********_df['QUEUE_NUMBER'].str[-3:] == '********', 'SHIPPINGQUEUENUMBER'] = ********_df['QUEUE_NUMBER']
+
+##Find punches with bad sq number data
+********_********or_df = ********_df.copy()
+********_********or_df = ********_********or_df[********_********or_df['SHIPPINGQUEUENUMBER'].isna()]
+********_********or_df['SHIPPINGQUEUENUMBER'] = ********_********or_df['SHIPPINGQUEUENUMBER'].fillna("Error")
+********_********or_df.drop('Subtask', axis=1, inplace=True)
+********_********or_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask'}, inplace=True)
+********_********or_df = ********_********or_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_********or_df])
+
+********_df.dropna(subset=["SHIPPINGQUEUENUMBER"], inplace=True)
+
+##Find non Roca SQs
+********_df["sq_********"] = ********_df['SHIPPINGQUEUENUMBER'].str[-3:]
+********_df['SHIPPINGQUEUENUMBER'] = ********_df['SHIPPINGQUEUENUMBER'].as********(str)
+********_df.loc[(********_df['SHIPPINGQUEUENUMBER'].map(len) == 16) & (********_df['SHIPPINGQUEUENUMBER'].str[-3:] != '********'), 'sq_********'] = ********_df['SHIPPINGQUEUENUMBER'].str[-6:]
+
+********_sq_********_df = ********_df.copy()
+********_sq_********_df = ********_sq_********_df[********_sq_********_df['sq_********'].str[:1] != 'r']
+********_sq_********_df['SHIPPINGQUEUENUMBER'] = "Error"
+********_sq_********_df.drop('Subtask', axis=1, inplace=True)
+********_sq_********_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask'}, inplace=True)
+********_sq_********_df = ********_sq_********_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_sq_********_df])
+
+********_df = ********_df[********_df['sq_********'].str[:1] == 'r']
+
+##Find SQs without ********ify status
+********_********ify_df = ********_df.copy()
+********_********ify_df = ********_********ify_df[********_********ify_df['Units'] == '']
+********_********ify_df['Units'] = "Error"
+********_********ify_df.drop('Subtask', axis=1, inplace=True)
+********_********ify_df.rename(columns={'SHIPPINGQUEUENUMBER':'Subtask'}, inplace=True)
+********_********ify_df = ********_********ify_df[['Punch', 'Puncher', 'Task', 'Subtask', 'Units', 'Orders Completed', '******** Run', '******** Run']]
+
+error_df = pd.concat([error_df, ********_********ify_df])
+
+********_df = ********_df[********_df['Units'] != '']
+
+##Normalize punches
+********_df["normal_punch"] = pd.to_datetime(********_df['Punch']).dt.date
+
+##Merge shift data
+********_df = pd.merge(********_df, shiftdata_df, how='left', on='********')
+********_df = ********_df.loc[(********_df['Punch'] >= ********_df['minimum']) & (********_df['Punch'] <= ********_df['maximum'])]
+********_df.drop(['Puncher_x', 'Puncher_y'], axis=1, inplace=True)
+
+##********
+********_df.rename(columns={'Date':'********', 'Units':'Full ********ify?','sq_card_quantity':'Units'}, inplace=True)
+********_df['********'] = pd.to_datetime(********_df['********'], format='%m-%d-%Y').dt.date
+
+##Build ******** res standards dataframe
+sq_********_standards_df = standards_df.copy()
+sq_********_standards_df = sq_********_standards_df.loc[sq_********_standards_df['Task'] == 'SQ ********']
+
+##Merge Standards with Dataframe
+sq_********_standards_df['Subtask'] = sq_********_standards_df['Subtask'].str.lower()
+********_df['sq_********'] = ********_df['sq_********'].str.lower()
+
+********_df.drop('Subtask', axis=1, inplace=True)
+********_df.rename(columns={'sq_********':'Subtask'}, inplace=True)
+
+********_df = pd.merge(********_df, sq_********_standards_df, how='left', on='Subtask')
+
+##Calculate Metrics
+********_df = ********_df.loc[(********_df['********'].as********('float64') > 0) & (********_df['********'] != 0)]
+
+********_df['Coeff 1 Units'] = ********_df['Units']
+********_df['Coeff 2 Units'] = 0
+********_df['Coeff 3 Units'] = 0
+********_df['Coeff 4 Units'] = 0
+********_df['Coeff 5 Units'] = 0
+********_df['Coeff 6 Units'] = 0
+
+********_df.loc[********_df['Y-Int Def'] == 'CPH', '********'] = ********_df['Units'].as********('int64') / ((********_df['Y-Int'].as********('float64') +
+(********_df['Coeff 1 Units'].as********('float64') * ********_df['Coeff 1'].as********('float64')) +
+(********_df['Coeff 2 Units'].as********('float64') * ********_df['Coeff 2'].as********('float64')) +
+(********_df['Coeff 3 Units'].as********('float64') * ********_df['Coeff 3'].as********('float64')) +
+(********_df['Coeff 4 Units'].as********('float64') * ********_df['Coeff 4'].as********('float64')) +
+(********_df['Coeff 5 Units'].as********('float64') * ********_df['Coeff 5'].as********('float64')) +
+(********_df['Coeff 6 Units'].as********('float64') * ********_df['Coeff 6'].as********('float64'))
+) * ********_df['********'].as********('float64'))
+
+********_df.loc[********_df['Y-Int Def'] == 'SPC', '********'] = ********_df['Units'].as********('int64') / (( 3600 / (********_df['Y-Int'].as********('float64') +
+(********_df['Coeff 1 Units'].as********('float64') * ********_df['Coeff 1'].as********('float64')) +
+(********_df['Coeff 2 Units'].as********('float64') * ********_df['Coeff 2'].as********('float64')) +
+(********_df['Coeff 3 Units'].as********('float64') * ********_df['Coeff 3'].as********('float64')) +
+(********_df['Coeff 4 Units'].as********('float64') * ********_df['Coeff 4'].as********('float64')) +
+(********_df['Coeff 5 Units'].as********('float64') * ********_df['Coeff 5'].as********('float64')) +
+(********_df['Coeff 6 Units'].as********('float64') * ********_df['Coeff 6'].as********('float64'))
+)) * ********_df['********'].as********('float64'))
+
+##Create final dataframe
+********_df.drop(['Subtask'], axis=1, inplace=True)
+********_df.rename(columns={'Preferred Name':'Puncher', 'SHIPPINGQUEUENUMBER':'Subtask', 'Task_y':'Task'}, inplace=True)
+********_df['Task'] = "SQ ********"
+
+********_df = ********_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********','Test','Notes']]
+
+###Receiving Module
+##RI ******** Time
+rec_df["********_time"] = 61 + (0.185 * rec_df['NUMBER_OF_CARDS'].as********('int64'))
+
+rec_df.loc[rec_df['********_time'] > 209, '********_time'] = 209
+
+##Create proc and ******** ********s
+rec_df["Task"] = ""
+rec_df.loc[rec_df['PROC_TIME_MINUTES'].as********('float64') > 0, 'Task'] = "RI Proc"
+rec_df = rec_df.loc[rec_df['Task'] != '']
+
+##Define RI Proc Standards
+rec_proc_standards_df = standards_df.copy()
+rec_proc_standards_df = rec_proc_standards_df.loc[rec_proc_standards_df['Task'] == 'RI Proc']
+
+rec_df = rec_df.loc[rec_df['Task'] != '']
+rec_df["combined"] = rec_df['Task'].as********(str) + rec_df['********'].as********(str)
+
+rec_proc_standards_df["combined"] = rec_proc_standards_df['Task'].as********(str) + rec_proc_standards_df['Subtask'].as********(str)
+
+rec_df = pd.merge(rec_df, rec_proc_standards_df, left_on='combined', right_on='combined')
+
+rec_df = rec_df[['RI_NUMBER', 'NUMBER_OF_CARDS', 'PROCESSOR_EMAIL', 'PROCESSING_ENDED','PROC_MISS_COUNT_ENTERED', 'PROC_COND_COUNT_ENTERED', 'PROC_EXTRA_COUNT_ENTERED', 'sleeved_cards', 'cabinet_splits', '********', 'Task_x', '********_time', 'Y-Int', 'Coeff 1', 'Coeff 2', 'Coeff 3', 'Coeff 4', 'Coeff 5', 'Coeff 6', 'Y-Int Def', 'RI_********']]
+
+##Prep dataframes for merge
+rec_df.rename(columns={'PROCESSING_ENDED': 'Punch','PROCESSOR_EMAIL': 'Puncher','Task_x': 'Task','********': 'Subtask'}, inplace=True)
+
+rec_df["Dupe"] = rec_df['Puncher'].as********(str) + rec_df['Task'].as********(str) + rec_df['NUMBER_OF_CARDS'].as********(str) + rec_df['Subtask'].as********(str) + rec_df['RI_NUMBER'].as********(str)
+
+rec_df.drop_duplicates(subset=['Dupe'], inplace=True)
+rec_df.drop('Dupe', axis=1, inplace=True)
+
+##Normalize punches
+rec_df["normal_punch"] = pd.to_datetime(rec_df['Punch'], format='mixed').dt.date
+
+##Merge staffing data and include current team members
+rec_df['Puncher'] = rec_df['Puncher'].str.lower()
+rec_df = pd.merge(rec_df, staffing_df, how='left', on='Puncher')
+rec_df = rec_df.loc[rec_df['Shift Length'].apply(pd.to_numeric, errors='coerce') > 0]
+
+##Merge shift data
+rec_df = pd.merge(rec_df, shiftdata_df, how='left', on='Puncher')
+rec_df = rec_df.loc[(rec_df['Punch'] >= rec_df['minimum']) & (rec_df['Punch'] <= rec_df['maximum'])]
+
+##********
+rec_df.rename(columns={'Date':'********'}, inplace=True)
+rec_df['********'] = pd.to_datetime(rec_df['********'], format='%m-%d-%Y').dt.date
+
+##Calculate receiving metrics
+rec_df = rec_df.loc[(rec_df['********'].as********('float64') > 0) & (rec_df['********'] != 0)]
+
+rec_df["********"] = ""
+
+rec_df["Proc Coeff 1 Units"] = rec_df['NUMBER_OF_CARDS']
+rec_df["Proc Coeff 2 Units"] = rec_df['PROC_MISS_COUNT_ENTERED']
+rec_df["Proc Coeff 3 Units"] = rec_df['PROC_EXTRA_COUNT_ENTERED']
+rec_df["Proc Coeff 4 Units"] = rec_df['PROC_COND_COUNT_ENTERED']
+rec_df["Proc Coeff 5 Units"] = 0
+rec_df["Proc Coeff 6 Units"] = 0
+
+rec_df.loc[rec_df['Y-Int Def'] == 'CPH', '********'] = rec_df['NUMBER_OF_CARDS'].as********('int64') / ((rec_df['Y-Int'].as********('float64') +
+(rec_df['Proc Coeff 1 Units'].as********('float64') * rec_df['Coeff 1'].as********('float64')) +
+(rec_df['Proc Coeff 2 Units'].as********('float64') * rec_df['Coeff 2'].as********('float64')) +
+(rec_df['Proc Coeff 3 Units'].as********('float64') * rec_df['Coeff 3'].as********('float64')) +
+(rec_df['Proc Coeff 4 Units'].as********('float64') * rec_df['Coeff 4'].as********('float64')) +
+(rec_df['Proc Coeff 5 Units'].as********('float64') * rec_df['Coeff 5'].as********('float64')) +
+(rec_df['Proc Coeff 6 Units'].as********('float64') * rec_df['Coeff 6'].as********('float64'))
+) * rec_df['********'].as********('float64'))
+
+rec_df.loc[rec_df['Y-Int Def'] == 'SPC', '********'] = rec_df['NUMBER_OF_CARDS'].as********('int64') / (( 3600 / (rec_df['Y-Int'].as********('float64') +
+(rec_df['Proc Coeff 1 Units'].as********('float64') * rec_df['Coeff 1'].as********('float64')) +
+(rec_df['Proc Coeff 2 Units'].as********('float64') * rec_df['Coeff 2'].as********('float64')) +
+(rec_df['Proc Coeff 3 Units'].as********('float64') * rec_df['Coeff 3'].as********('float64')) +
+(rec_df['Proc Coeff 4 Units'].as********('float64') * rec_df['Coeff 4'].as********('float64')) +
+(rec_df['Proc Coeff 5 Units'].as********('float64') * rec_df['Coeff 5'].as********('float64')) +
+(rec_df['Proc Coeff 6 Units'].as********('float64') * rec_df['Coeff 6'].as********('float64'))
+)) * rec_df['********'].as********('float64'))
+
+##Account for ******** time
+rec_df['********'] = rec_df['********'].as********('float64') + ((rec_df['********_time'].as********('float64')/60/60) / rec_df['********'].as********('float64'))
+
+rec_df["Test"] = ""
+rec_df["Notes"] = ""
+
+rec_df.drop('Puncher', axis=1, inplace=True)
+rec_df.rename(columns={'Preferred Name':'Puncher'}, inplace=True)
+
+##Create final dataframe
+rec_df.rename(columns={'NUMBER_OF_CARDS':'Units'}, inplace=True)
+
+rec_df = rec_df[['Punch','********','Puncher','Units','Task','Subtask','********','********','********','********']]
+
+###Final tweaks
+##Combine Data Frames
+data_df = pd.DataFrame()
+
+data_df = pd.concat([********_df, ********_********_df])
+
+data_df = pd.concat([data_df, ********_df])
+
+data_df = pd.concat([data_df, pull_df])
+
+data_df = pd.concat([data_df, gen_df])
+
+data_df = pd.concat([data_df, filing_df])
+
+data_df = pd.concat([data_df, ********_df])
+
+data_df = pd.concat([data_df, ********_df])
+
+data_df = pd.concat([data_df, rec_df])
+
+data_df = pd.concat([data_df, ********_df])
+
+##Only include last 90 days
+data_df['********'] = pd.to_datetime(data_df['********'], format='%m-%d-%Y').dt.date
+
+data_df["now"] = pd.Timestamp.now()
+data_df['now'] = data_df['now'].dt.date
+
+data_df = data_df.loc[data_df['********'] >= (data_df['now'] - timedelta(days = 90))]
+
+##Aggragate ********'s
+data_df["combined"] = data_df['********'].as********(str) + data_df['Puncher'].as********(str)
+
+day_per_agg = data_df.groupby('combined')['********'].sum()
+data_df = pd.merge(data_df, day_per_agg, how='right', on='combined')
+data_df.rename(columns={'********_y':'Total_********', '********_x':'********'}, inplace=True)
+
+#data_df['Total_********'] = data_df['Total_********']
+data_df['Total_********'] = data_df['Total_********'] + 0.0833
+
+data_df["Total_********"] = ((data_df['********'].as********('float64'))/24) * data_df['Total_********']
+data_df["********"] = ((data_df['********'])/24) * data_df['********']
+
+data_df['Punch'] = data_df['Punch'].apply(pd.to_datetime, errors='coerce')
+
+data_df.sort_values(by=['Puncher', 'Punch'], ascending=[True,False], inplace=True)
+
+##Make ******** and parsed data
+data_df['Test'] = data_df['Test'].fillna('')
+data_df['Notes'] = data_df['Notes'].fillna('')
+
+parsed_data_df = data_df.copy()
+
+********_df = data_df.copy()
+
+********_df.drop_duplicates(subset=['combined'], inplace=True)
+
+********_df = ********_df[['********', 'Puncher', 'Total_********', '********']]
+
+data_df['Data'] = data_df['Punch'].as********(str) + "|" + data_df['********'].as********(str) + "|" + data_df['Puncher'].as********(str) + "|" + data_df['Units'].as********(str) + "|" + data_df['Subtask'].as********(str) + "|" + data_df['********'].as********(str) + "|" + data_df['********'].as********(str) + "|" + data_df['Task'].as********(str) + "|" + data_df['********'].as********(str) + "|" + data_df['Total_********'].as********(str) + "|" + data_df['Total_********'].as********(str) + "|" + data_df['********'].as********(str) + "|" + data_df['********'].as********(str) + "|" + "" + "|" + data_df['Orders'].as********(str) + "|" + data_df['Test'].as********(str) + "|" + data_df['Notes'].as********(str)
+
+data_df = data_df[['Data']]
+
+error_df.loc[error_df['Puncher'] == 'Error', 'Punch'] = None
+error_df.dropna(subset=["Punch"], inplace=True)
+
+##Parse down to individual + day totals
+parsed_data_df.drop_duplicates(subset=['combined'], inplace=True)
+
+parsed_data_df = parsed_data_df[['********','Puncher','********','Total_********','Total_********','********']]
+
+parsed_data_df.rename(columns={'********':'Date', 'Puncher': 'Team Member', '********': 'Hours ********', 'Total_********': 'Total ********', 'Total_********': 'Total ******** Hours', '********': 'Pillar'}, inplace=True)
+
+##Create csvs
+data_string = ********
+data_result = separator.join(data_string)
+data_df.to_csv(data_result, index=False)
+
+error_string = ********
+********ult = separator.join(error_string)
+error_df.to_csv(********ult, index=False)
+
+********_string = ********
+********_result = separator.join(********_string)
+********_df.to_csv(********_result, index=False)
+
+parsed_data_string = ********
+parsed_data_result = separator.join(parsed_data_string)
+parsed_data_df.to_csv(parsed_data_result, index=False)
+
+##Update audit log
+csv_string = ********
+result = separator.join(csv_string)
+audit_df = pd.read_csv(result)
+
+executionTime = (time.time() - startTime)
+dt_string = datetime.now(pytz.timezone('America/New_York')).strftime("%m/%d/%Y %H:%M:%S")
+script_name = os.path.basename(__file__).replace('.py', '')
+
+new_audit = {'Timestamp': dt_string, 'Execution Time': executionTime, 'Script': script_name}
+
+new_audit_df = pd.DataFrame(data=new_audit, index=[0])
+
+audit_df = pd.concat([audit_df, new_audit_df])
+audit_df.dropna(subset=["Timestamp"], inplace=True)
+
+audit_df.to_csv(result, index=False)
