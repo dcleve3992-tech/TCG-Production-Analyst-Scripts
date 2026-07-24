@@ -15,30 +15,25 @@ startTime = time.time()
 
 gc=gspread.service_account()
 
-filename = separator.join(["C:", "Users", login, "Desktop", "Python", "Credentials.txt"])
-with open(filename, "rt") as f:
-    text = f.readline()
-username, password, account = text.strip().split('~')
-
 import snowflake.connector
 from snowflake.connector import connect
-snowflake_pull = connect(user=username, password=password, account=account)
+snowflake_pull = connect(********)
 
 ##PVP SQ Data
 sq_sql = ("""
 select
-    distinct category.******** as game_name
-    , directorder.******** as order_number
-    , shippingqueue.******** as shipping_queue_number
+    distinct category.categoryname as game_name
+    , directorder.directordernumber as order_number
+    , shippingqueue.shippingqueuenumber as shipping_queue_number
 
 from
-********.directorder
-inner join ********.shippingqueue on directorder.******** = shippingqueue.********
-inner join ********.sellerorder on directorder.******** = sellerorder.********
-inner join ********.sellerorderproduct on sellerorder.******** = sellerorderproduct.********
-inner join ********t.productcondition on sellerorderproduct.******** = productcondition.********
-inner join ********.product on productcondition.******** = product.********
-inner join ********.category on product.******** = category.********
+********.********.directorder
+inner join ********.********.shippingqueue on directorder.shippingqueueid = shippingqueue.shippingqueueid
+inner join ********.********.sellerorder on directorder.orderid = sellerorder.orderid
+inner join ********.********.sellerorderproduct on sellerorder.sellerorderid = sellerorderproduct.sellerorderid
+inner join ********.********.productcondition on sellerorderproduct.storeproductconditionid = productcondition.productconditionid
+inner join ********.********.product on productcondition.productid = product.productid
+inner join ********.********.category on product.categoryid = category.categoryid
 
 where
     directorder.createdat::date >= cast(dateadd(dd, -150, getdate()) as date)
@@ -71,29 +66,29 @@ sq_df.to_csv(sq_result, index=False)
 ##Tix data
 sql_tix = (r"""
 select
-  zendesk.******** as tix_id
-  , left(********,11) as ticket_order_number_1
-  , right(********,11) as ticket_order_number_2
-  , regexp_substr(********,'\\d{6}-\\w{4}') as comment_body
-  , regexp_substr(********,'\\d{6}-\\w{4}') as title
-  , case when contains(********,********) or contains(********,********) then 'card' end as card_tag
-  , case when contains(********,********) then 'qty' end as qty_tag
-  , case when contains(********,********) or contains(********,********) then 'pkg' end as pkg_tag
-  , case when contains(********, ********) then 'ctf' end as ctf_tag
-  , case when contains(********, ********) then 'cnd' end as cnd_tag
+  ********.tickets.id as tix_id
+  , left(********.tickets.order_number,11) as ticket_order_number_1
+  , right(********.tickets.order_number,11) as ticket_order_number_2
+  , regexp_substr(ticket_comments.body,'\\d{6}-\\w{4}') as comment_body
+  , regexp_substr(********.tickets.subject,'\\d{6}-\\w{4}') as title
+  , case when contains(********.tickets.********,'********_cardname') or contains(********.tickets.********,'********_card') then 'card' end as card_tag
+  , case when contains(********.tickets.********,'********_quantity') then 'qty' end as qty_tag
+  , case when contains(********.tickets.********,'********_package') or contains(********.tickets.********,'********') then 'pkg' end as pkg_tag
+  , case when contains(********.tickets.********, '********') then 'ctf' end as ctf_tag
+  , case when contains(********.tickets.********, 'condition') then 'cnd' end as cnd_tag
 
 from
-********
-inner join ******** on ******** = ********
+segment.********.tickets
+inner join segment.********.ticket_comments on ********.tickets.id = ticket_comments.ticket_id
 
-where ********::date >= cast(dateadd(dd, -150, getdate()) as date)
+where ********.tickets.received_at::date >= cast(dateadd(dd, -150, getdate()) as date)
 
 group by
-    ********
-    , ********
-    , ********
-    , ********
-    , ********
+    ********.tickets.id
+    , ********.tickets.order_number
+    , ticket_comments.body
+    , ********.tickets.subject
+    , ********.tickets.********
 
 """)
 
