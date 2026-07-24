@@ -23,31 +23,31 @@ hour = dt_string.hour
 pillar = 'None'
 
 if (hour == 7) or (hour == 19):
-    pillar = "Operations 1"
+    pillar = "******** 1"
 
 elif (hour == 8) or (hour == 20):
-    pillar = "Shipping Supe"
+    pillar = "******** Supe"
 
 elif (hour == 9) or (hour == 21):
-    pillar = "Receiving Supe"
+    pillar = "******** Supe"
 
 elif (hour == 10) or (hour == 22):
-    pillar = "Shipping Lead"
+    pillar = "******** Lead"
 
 elif (hour == 11) or (hour == 23):
-    pillar = "Receiving Lead"
+    pillar = "******** Lead"
 
 elif (hour == 12) or (hour == 0):
-    pillar = "Operations 2"
+    pillar = "******** 2"
 
 elif (hour == 13) or (hour == 1):
-    pillar = "Training"
+    pillar = "********"
 
 elif (hour == 14) or (hour == 2):
-    pillar = "Overnight Supe"
+    pillar = "******** Supe"
 
 elif (hour == 15) or (hour == 3):
-    pillar = "Overnight Lead"
+    pillar = "******** Lead"
 
 if pillar == "None":
     exit()
@@ -55,42 +55,42 @@ if pillar == "None":
 ##Import Staffing Data
 staffing = gc.open_by_key(********).worksheet('Current Staff')
 staffing_df = pd.DataFrame.from_dict(staffing.get_all_records())
-staffing_df.dropna(subset=["Preferred Name"], inplace=True)
-staffing_df = staffing_df[['Preferred Name', 'Email', 'Shift Length','Shift Name', 'Start Date', 'Supervisor', 'OPs Lead', 'Last, First (Formatting)', 'Role']]
+staffing_df.dropna(subset=[********], inplace=True)
+staffing_df = staffing_df[[********]]
 staffing_df.rename(columns={'Email':'Puncher'}, inplace=True)
 
-##Import scorecard data
-url_df = gd.get_as_dataframe(gc.open_by_key(********).worksheet('Scorecards'))
+##Import ******** data
+url_df = gd.get_as_dataframe(gc.open_by_key(********).worksheet('********s'))
 url_df.dropna(subset=["Google Key"], inplace=True)
 url_df = url_df[['Google Key', 'User', 'Subgroup', 'Email']]
 
-dataTab_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "Data.csv"]
+dataTab_string = ********
 dataTab_result = separator.join(dataTab_string)
 dataTab_df = pd.read_csv(dataTab_result)
 
-errorTab_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "Error.csv"]
+errorTab_string = ********
 errorTab_result = separator.join(errorTab_string)
 errorTab_df = pd.read_csv(errorTab_result)
 
-testDataTab_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "TestEnvData.csv"]
+testDataTab_string = ********
 testDataTab_result = separator.join(testDataTab_string)
 testDataTab_df = pd.read_csv(testDataTab_result)
 
-pfep_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "PFEP.csv"]
-pfep_result = separator.join(pfep_string)
-pfep_df = pd.read_csv(pfep_result)
+********_string = ********
+********_result = separator.join(********_string)
+********_df = pd.read_csv(********_result)
 
-if pillar == 'Operations':
-    print("PFEP Script")
+if pillar == '********':
+    print("******** Script")
 
-    pfepDataTab = gc.open_by_key(********).worksheet('NewData')
-    pfepPersonnelTab = gc.open_by_key(********).worksheet('Personnel')
+    ********DataTab = gc.open_by_key(********).worksheet('NewData')
+    ********PersonnelTab = gc.open_by_key********).worksheet('Personnel')
 
-    pfepDataTab.batch_clear(['A1:D'])
-    gd.set_with_dataframe(pfepDataTab, pfep_df, row=1, col=1)
+    ********DataTab.batch_clear(['A1:D'])
+    gd.set_with_dataframe(********DataTab, ********_df, row=1, col=1)
 
-    pfepPersonnelTab.clear()
-    gd.set_with_dataframe(pfepPersonnelTab, staffing_df)
+    ********PersonnelTab.clear()
+    gd.set_with_dataframe(********PersonnelTab, staffing_df)
 
 s = len(url_df);
 i = 0;
@@ -154,7 +154,7 @@ while i < s:
     i+=1
 
 ##Update audit log
-csv_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Audit CSVs", "AuditLog.csv"]
+csv_string = ********
 result = separator.join(csv_string)
 audit_df = pd.read_csv(result)
 
