@@ -32,7 +32,7 @@ staffing_df[********] = staffing_df[********].as********(str)
 ********_df[********] = ********_df[********].as********(str)
 
 ********_df = pd.merge(********_df, staffing_df, how='left', on=********)
-********_df = ********_df[[********, 'Former Email', 'Preferred Name_x', '********', 'Shift Length', 'Start Date', 'Supervisor', 'OPs Lead', 'Last, First (Formatting)']]
+********_df = ********_df[[********, 'Former Email', 'Preferred Name_x', '********', '********', 'Start Date', 'Supervisor', 'OPs Lead', 'Last, First (Formatting)']]
 ********_df.rename(columns={'Former Email':'Puncher', 'Preferred Name_x':'Preferred Name'}, inplace=True)
 staffing_df = pd.concat([staffing_df, ********_df])
 
@@ -57,7 +57,7 @@ shiftdata_df['Date'] = pd.to_datetime(shiftdata_df['Date']).dt.date
 shiftdata_df["now"] = pd.Timestamp.now()
 shiftdata_df = shiftdata_df.loc[shiftdata_df['Date'] >= (shiftdata_df['now'].dt.date - timedelta(days = 100))]
 
-##Adjusted Shift Length
+##Adjusted ********
 shiftdata_df["********"] = shiftdata_df['********'].as********('float64') - 1 - (shiftdata_df['********'].as********('float64')/0.2/60)
 
 shiftdata_df.loc[(shiftdata_df['********'].as********('float64') < 4) & ((shiftdata_df['********'].as********('float64') - 0.5) < 2), '********'] = shiftdata_df['********'] + 1
@@ -82,7 +82,6 @@ shiftdata_df['maximum'] = pd.to_datetime(shiftdata_df['maximum'])
 
 ###Import Standards
 standards = gc.open_by_key('********).worksheet('Current')
-#standards = gc.open_by_key(********).worksheet('Upcoming')
 standards_df = pd.DataFrame.from_dict(standards.get_all_records())
 
 standards_df.loc[standards_df['Y-Int'] == '', 'Y-Int'] = 0
@@ -143,7 +142,7 @@ elif standards_df.iloc[i, 1] == ********:
 ********_df.drop(['Puncher_x'], axis=1, inplace=True)
 
 ##Include current team members
-********_df = ********_df.loc[********_df['Shift Length'].apply(pd.to_numeric, errors='coerce') > 0]
+********_df = ********_df.loc[********_df['********'].apply(pd.to_numeric, errors='coerce') > 0]
 
 ##Clean SQ Number column
 ********_df["QUEUE_NUMBER"] = ********_df['Subtask']
@@ -164,7 +163,7 @@ rec_df['cabinet_splits'] = rec_df['cabinet_splits'].as********('float64')
 rec_df['ri_density'] = rec_df['ri_density'].as********('float64')
 
 ###Import ******** SQ Data
-********_sql_df = pd.read_csv(separator.join(["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "Snowflake", "********.csv"]))
+********_sql_df = ********
 
 ##Fix data ********s
 ********_sql_df['ORDER_COUNT'] = ********_sql_df['ORDER_COUNT'].as********('float64')
@@ -203,7 +202,7 @@ pull_df = sq_********_df.copy()
 ********_df = pd.merge(********_df, staffing_df, how='left', on='Puncher')
 
 ##Include current team members
-********_df = ********_df.loc[********_df['Shift Length'].apply(pd.to_numeric, errors='coerce') > 0]
+********_df = ********_df.loc[********_df['********'].apply(pd.to_numeric, errors='coerce') > 0]
 
 ##Prepare frame for merge
 ********_df["Task"] = "******** Pull"
@@ -1203,7 +1202,7 @@ rec_df["normal_punch"] = pd.to_datetime(rec_df['Punch'], format='mixed').dt.date
 ##Merge staffing data and include current team members
 rec_df['Puncher'] = rec_df['Puncher'].str.lower()
 rec_df = pd.merge(rec_df, staffing_df, how='left', on='Puncher')
-rec_df = rec_df.loc[rec_df['Shift Length'].apply(pd.to_numeric, errors='coerce') > 0]
+rec_df = rec_df.loc[rec_df['********'].apply(pd.to_numeric, errors='coerce') > 0]
 
 ##Merge shift data
 rec_df = pd.merge(rec_df, shiftdata_df, how='left', on='Puncher')
