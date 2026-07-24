@@ -23,20 +23,20 @@ snowflake_pull = connect(********)
 sq_sql = ("""
 select
     distinct category.categoryname as game_name
-    , directorder.directordernumber as order_number
+    , ********order.********ordernumber as order_number
     , shippingqueue.shippingqueuenumber as shipping_queue_number
 
 from
-********.********.directorder
-inner join ********.********.shippingqueue on directorder.shippingqueueid = shippingqueue.shippingqueueid
-inner join ********.********.sellerorder on directorder.orderid = sellerorder.orderid
+********.********.********order
+inner join ********.********.shippingqueue on ********order.shippingqueueid = shippingqueue.shippingqueueid
+inner join ********.********.sellerorder on ********order.orderid = sellerorder.orderid
 inner join ********.********.sellerorderproduct on sellerorder.sellerorderid = sellerorderproduct.sellerorderid
 inner join ********.********.productcondition on sellerorderproduct.storeproductconditionid = productcondition.productconditionid
 inner join ********.********.product on productcondition.productid = product.productid
 inner join ********.********.category on product.categoryid = category.categoryid
 
 where
-    directorder.createdat::date >= cast(dateadd(dd, -150, getdate()) as date)
+    ********order.createdat::date >= cast(dateadd(dd, -150, getdate()) as date)
     and ((game_name = 'Magic') or (game_name = 'Pokemon') or (game_name = 'YuGiOh'))
 
 order by
@@ -78,8 +78,8 @@ select
   , case when contains(********.tickets.********, 'condition') then 'cnd' end as cnd_tag
 
 from
-segment.********.tickets
-inner join segment.********.ticket_comments on ********.tickets.id = ticket_comments.ticket_id
+********.********.tickets
+inner join ********.********.ticket_comments on ********.tickets.id = ticket_comments.ticket_id
 
 where ********.tickets.received_at::date >= cast(dateadd(dd, -150, getdate()) as date)
 
