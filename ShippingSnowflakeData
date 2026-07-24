@@ -1,0 +1,341 @@
+import gspread
+import pandas as pd
+import gspread_dataframe as gd
+from datetime import datetime, timedelta
+import datetime as dt
+import time
+import os
+import numpy as np
+import pytz
+import datetime as dt
+
+login = os.getlogin()
+separator = '\\'
+startTime = time.time()
+
+gc=gspread.service_account()
+
+import snowflake.connector
+from snowflake.connector import connect
+snowflake_pull = connect(********)
+
+###Shipping
+##Import SQ ******** Data
+sql_******** = ("""
+select
+    case
+        when len(shippingqueue.shippingqueuenumber) in (11, 14) then left(shippingqueue.shippingqueuenumber, 8)
+        when len(shippingqueue.shippingqueuenumber) in (12, 15) then left(shippingqueue.shippingqueuenumber, 9)
+        when len(shippingqueue.shippingqueuenumber) in (13, 16) then left(shippingqueue.shippingqueuenumber, 10)
+        else shippingqueue.shippingqueuenumber
+            end as queue_number
+
+    , shippingqueue.shippingqueuenumber as shippingqueuenumber
+    , shippingqueue.ordercount as order_count
+    , shippingqueuepullsheet.******** as ********
+    , shippingqueuepullsheet.quantity as card_quantity
+    , category.categoryname as game_name
+    , shippingqueuepullsheet.productconditionid as pcid
+    , shippingqueue.createdat as created_at
+
+from
+********.********.shippingqueue
+inner join ********.********.shippingqueuepullsheet on shippingqueue.shippingqueueid = shippingqueuepullsheet.shippingqueueid
+inner join ********.********.productcondition on shippingqueuepullsheet.productconditionid = productcondition.productconditionid
+inner join ********.********.product on productcondition.productid = product.productid
+inner join ********.********.category on product.categoryid = category.categoryid
+
+where
+    shippingqueue.createdat::date >= cast(dateadd(dd, -120, getdate()) as date)
+
+group by
+    pcid
+    , shippingqueuenumber
+    , ********
+    , order_count
+    , game_name
+    , card_quantity
+    , created_at
+
+union all
+
+select
+    concat(********purchaseorderqueue.********purchaseorderqueuenumber, 'POQ')
+    , ********purchaseorderqueue.********purchaseorderqueuenumber as shippingqueuenumber
+    , ********purchaseorderqueue.ordercount as order_count
+    , ********purchaseorderqueuepullsheet.******** as ********
+    , ********purchaseorderqueuepullsheet.quantity as card_quantity
+    , category.categoryname as game_name
+    , ********purchaseorderqueuepullsheet.productconditionid as pcid
+    , ********purchaseorderqueue.createdat as created_at
+
+from
+********.********.********purchaseorderqueue
+inner join ********.********.********purchaseorderqueuepullsheet on ********purchaseorderqueue.********purchaseorderqueueid = ********purchaseorderqueuepullsheet.********purchaseorderqueueid
+inner join ********.********.productcondition on ********purchaseorderqueuepullsheet.productconditionid = productcondition.productconditionid
+inner join ********.********.product on productcondition.productid = product.productid
+inner join ********.********.category on product.categoryid = category.categoryid
+
+where
+    ********purchaseorderqueue.createdat::date >= cast(dateadd(dd, -120, getdate()) as date)
+
+group by
+    pcid
+    , shippingqueuenumber
+    , ********
+    , order_count
+    , game_name
+    , card_quantity
+    , created_at
+
+""")
+
+cursor = snowflake_pull.cursor()
+cursor.execute(sql_********)
+
+********_df = cursor.fetch_pandas_all()
+********_df.drop(********_df.filter(like='Unnamed'), axis=1, inplace=True)
+********_df.dropna(subset = ['QUEUE_NUMBER'], inplace=True)
+
+##Parse ********s
+********_df['********'] = ********_df['********'].astype(str)
+
+********_df = ********_df.loc[********_df['SHIPPINGQUEUENUMBER'].str[-2:] != 'HQ']
+
+********_df["********_parse"] = ********_df['********'].map(ord)
+
+********_df['********_parse'] = ********_df['********_parse'] - 64
+
+********_df['********_parse'] = ********_df['********_parse'].astype(str)
+
+********_df["check"] = ********_df['********_parse'].str[:1]
+
+********_df.loc[********_df['********_parse'].str[:1] == "-", '********_parse'] = ********_df['********']
+
+********_df['********'] = ********_df['********_parse']
+
+********_df['********_parse'] = ********_df['********_parse'].astype('int64')
+
+********_df.drop('check', axis=1, inplace=True)
+
+##Create dataframe for ******** data and aggragate SQ card quantity
+cards_by_sq = ********_df.groupby('SHIPPINGQUEUENUMBER')['CARD_QUANTITY'].sum()
+********_df = pd.merge(********_df, cards_by_sq, how='right', on='SHIPPINGQUEUENUMBER')
+********_df.rename(columns={'CARD_QUANTITY_x':'CARD_QUANTITY', 'CARD_QUANTITY_y':'sq_card_quantity'}, inplace=True)
+
+##Create sqacc csv
+sqacc_string = ********
+sqacc_result = separator.join(sqacc_string)
+********_df.to_csv(sqacc_result, index=False)
+
+##Aggragate unique pcids and card quantity by ********
+********_df["combined"] = ********_df['SHIPPINGQUEUENUMBER'].astype(str) + ********_df['********'].astype(str)
+
+unique_pcids_by_******** = ********_df.groupby('combined')['PCID'].nunique()
+********_df = pd.merge(********_df, unique_pcids_by_********, how='right', on='combined')
+
+card_qty_by_******** = ********_df.groupby('combined')['CARD_QUANTITY'].sum()
+********_df = pd.merge(********_df, card_qty_by_********, how='right', on='combined')
+
+********_df.drop_duplicates(subset=['combined'], inplace=True)
+
+********_df.drop(['PCID_x', 'CARD_QUANTITY_x'], axis=1, inplace=True)
+********_df.rename(columns={'PCID_y':'unique_pcids_by_********', 'CARD_QUANTITY_y':'card_qty_by_********'}, inplace=True)
+
+##Create final dataframe
+********_df = ********_df[['QUEUE_NUMBER', 'SHIPPINGQUEUENUMBER', '********', 'unique_pcids_by_********', 'card_qty_by_********', 'ORDER_COUNT', 'sq_card_quantity', 'CREATED_AT']]
+
+##Create sq********.csv
+pull_string = ********
+pull_result = separator.join(pull_string)
+********_df.to_csv(pull_result, index=False)
+
+##Parse down to single SQs in ******** dataframe
+********_df.drop_duplicates(subset=['SHIPPINGQUEUENUMBER'], inplace=True)
+
+********_df = ********_df[['QUEUE_NUMBER', 'SHIPPINGQUEUENUMBER', 'ORDER_COUNT', 'sq_card_quantity', 'CREATED_AT']]
+
+##Create ********.csv
+********_string = ********
+********_result = separator.join(********_string)
+********_df.to_csv(********_result, index=False)
+
+###******** Pulling
+##Import ******** Data
+sql_******** = ("""
+select
+    ********.core.********_pulling_agg.puller_email as puncher
+    , ********.core.********_pulling_agg.shipping_queue_number as sq
+    , ********.core.********_pulling_agg.pulling_start as pulling_start
+    , ********.core.********_pulling_agg.pulling_end as punch
+    , ********.core.********_pulling_agg.total_number_of_cards_pulled as cards_pulled
+    , ********.core.********_pulling_agg.density_pulled as density_pulled
+    , ********.core.********_pulling_agg.total_time_spent_pulling_seconds as pulling_time_seconds
+    , ********.core.********_pulling_agg.total_time_paused_seconds as paused_time_seconds
+
+from
+********.core.********_pulling_agg
+
+where
+    punch::date >= cast(dateadd(dd, -120, getdate()) as date)
+
+""")
+
+cursor = snowflake_pull.cursor()
+cursor.execute(sql_********)
+
+********_df = cursor.fetch_pandas_all()
+********_df.drop(********_df.filter(like='Unnamed'), axis=1, inplace=True)
+********_df.dropna(subset = ['PUNCHER'], inplace=True)
+
+##Fix data types
+********_df['DENSITY_PULLED'] = ********_df['DENSITY_PULLED'].astype('float64')
+
+##Convert time to hours
+********_df['PULLING_TIME_SECONDS'] = ********_df['PULLING_TIME_SECONDS'].astype('float64')
+********_df["pulling_time_hours"] = ********_df['PULLING_TIME_SECONDS']/3600
+
+##********
+********_df["********"] = ********_df['SQ'].str[-3:]
+********_df.loc[(********_df['SQ'].map(len) == 16) & (********_df['SQ'].str[-3:] != 'poq'), '********'] = ********_df['SQ'].str[-6:]
+
+##Remove patched SQs
+********_df.loc[(********_df['DENSITY_PULLED'] == 1) & (********_df['********'] != 'sccSub') & (********_df['********'] != 'sco'), 'Puncher'] = None
+
+##Create final dataframe
+********_df = ********_df[['PUNCHER', 'SQ', 'PUNCH', 'CARDS_PULLED', 'DENSITY_PULLED', 'PAUSED_TIME_SECONDS', 'pulling_time_hours', '********', 'PULLING_START']]
+
+##Write data to sheet
+ppDataTab = gc.open_by_key(********).worksheet('PPData')
+ppDataTab.clear()
+gd.set_with_dataframe(ppDataTab, ********_df)
+
+##Create ********.csv
+********_string = ********
+********_result = separator.join(********_string)
+********_df.to_csv(********_result, index=False)
+
+##Import cabinet data for ******** doc
+cab_sql = ("""
+select
+    distinct concat(direct_inventory.set_name,  '-', direct_inventory.condition) as identifier
+    , direct_inventory.set_name as set_name
+    , direct_inventory.condition as cond_name
+    , sku_hist.location_name as cabinet
+    , sku_hist.physical_order as physical_order
+
+
+from ********.core.fulfillment_center_skus_location_history as sku_hist
+inner join ********.core.direct_inventory on sku_hist.product_condition_id = direct_inventory.product_condition_id
+
+where
+    sku_hist.effective_to is null
+
+""")
+
+cursor = snowflake_pull.cursor()
+cursor.execute(cab_sql)
+
+cab_df = cursor.fetch_pandas_all()
+
+cab_df.drop(cab_df.filter(like='Unnamed'), axis=1, inplace=True)
+cab_df.dropna(subset=['CABINET'], inplace=True)
+
+cab_df["game_name"] = cab_df['CABINET'].str.split('-').str[0]
+cab_df["condition_name"] = cab_df['CABINET'].str.split('-').str[1]
+cab_df["cab_number"] = cab_df['CABINET'].str.split('-').str[2]
+
+cab_df["condition_order"] = 100
+
+cab_df.loc[cab_df['condition_name'] == 'NM', 'condition_order'] = 1
+cab_df.loc[cab_df['condition_name'] == 'LP', 'condition_order'] = 2
+cab_df.loc[cab_df['condition_name'] == 'MP', 'condition_order'] = 3
+cab_df.loc[cab_df['condition_name'] == 'HP', 'condition_order'] = 4
+cab_df.loc[cab_df['condition_name'] == 'NMF', 'condition_order'] = 5
+cab_df.loc[cab_df['condition_name'] == 'LPF', 'condition_order'] = 6
+cab_df.loc[cab_df['condition_name'] == 'MPF', 'condition_order'] = 7
+cab_df.loc[cab_df['condition_name'] == 'HPF', 'condition_order'] = 8
+cab_df.loc[cab_df['condition_name'] == 'NMH', 'condition_order'] = 9
+cab_df.loc[cab_df['condition_name'] == 'LPH', 'condition_order'] = 10
+cab_df.loc[cab_df['condition_name'] == 'MPH', 'condition_order'] = 11
+
+cab_df["game_order"] = 100
+
+cab_df.loc[cab_df['game_name'] == 'MTG', 'game_order'] = 1
+cab_df.loc[cab_df['game_name'] == 'PKM', 'game_order'] = 2
+cab_df.loc[cab_df['game_name'] == 'YGO', 'game_order'] = 3
+
+cab_df.sort_values(by=['game_order', 'condition_order', 'CABINET'], ascending=[True, True, True], inplace=True)
+
+unique_cabs_df = cab_df.copy()
+unique_cabs_df = unique_cabs_df[['CABINET']]
+unique_cabs_df.drop_duplicates(subset=['CABINET'], inplace=True)
+
+unique_cabs_df = unique_cabs_df[['CABINET']]
+
+cab_df = cab_df[['SET_NAME', 'COND_NAME', 'CABINET']]
+
+##Write data to sheet
+doc******** = gc.open_by_key(********)
+cabTab = doc********.worksheet('Cabinets')
+cabTab.batch_clear(['A1:D'])
+gd.set_with_dataframe(cabTab, cab_df, row=1, col=1)
+gd.set_with_dataframe(cabTab, unique_cabs_df, row=1, col=4)
+
+##Mail check in
+sql_mail = ("""
+select
+    reimbursement_invoices.reimbursement_invoice_number as package_number
+    , reimbursement_invoices.total_product_quantity as card_count
+    , users.email_address as user_email
+    , convert_timezone('UTC', 'America/New_York', reimorderaudit.createdat) as check_in_time
+
+    , case
+        when reimorderauditchange.originalvalue = '2' and reimorderauditchange.newvalue = '3' then 'RI - Received'
+        else null
+        end as event_type
+
+from
+********.core.reimbursement_invoices
+inner join ********.********.ReimOrder on ********.********.ReimOrder.ReimOrderNumber = reimbursement_invoices.reimbursement_invoice_number
+inner join ********.adt.reimorderaudit on ********.********.ReimOrder.reimorderid = reimorderaudit.reimorderid
+inner join ********.adt.reimorderauditchange on reimorderaudit.reimorderauditid = reimorderauditchange.reimorderauditid
+inner join ********.core.users on reimorderaudit.createdbyuserid = users.id
+
+where
+    cast(check_in_time as date) >= dateadd(dd, -31, getdate())
+    and reimbursement_invoices.is_auto = false
+    and reimorderauditchange.originalvalue is not null
+    and event_type is not null
+
+""")
+
+cursor = snowflake_pull.cursor()
+cursor.execute(sql_mail)
+
+mail_df = cursor.fetch_pandas_all()
+
+mail_df = mail_df[['PACKAGE_NUMBER', 'CHECK_IN_TIME', 'EVENT_TYPE', 'USER_EMAIL', 'CARD_COUNT']]
+
+##Write data to sheet
+mailDataTab = gc.open_by_key(********).worksheet('Data')
+mailDataTab.clear()
+gd.set_with_dataframe(mailDataTab, mail_df)
+
+##Update audit log
+csv_string = ********
+result = separator.join(csv_string)
+audit_df = pd.read_csv(result)
+
+executionTime = (time.time() - startTime)
+dt_string = datetime.now(pytz.timezone('America/New_York')).strftime("%m/%d/%Y %H:%M:%S")
+script_name = os.path.basename(__file__).replace('.py', '')
+
+new_audit = {'Timestamp': dt_string, 'Execution Time': executionTime, 'Script': script_name}
+
+new_audit_df = pd.DataFrame(data=new_audit, index=[0])
+
+audit_df = pd.concat([audit_df, new_audit_df])
+audit_df.dropna(subset=["Timestamp"], inplace=True)
+
+audit_df.to_csv(result, index=False)
