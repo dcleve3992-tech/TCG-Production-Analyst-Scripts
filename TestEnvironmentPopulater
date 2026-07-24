@@ -20,23 +20,23 @@ currDataTab = gc.open_by_key(********).worksheet('CurrentData')
 errorTab = gc.open_by_key(********).worksheet('Errors')
 
 ##Import and parse data csvs
-data_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "TestEnvData.csv"]
+data_string = ********
 data_result = separator.join(data_string)
 data_df = pd.read_csv(data_result)
 
-parsed_data_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "TestEnvParsedData.csv"]
+parsed_data_string = ********
 parsed_data_result = separator.join(parsed_data_string)
 parsed_data_df = pd.read_csv(parsed_data_result)
 
-curr_data_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "Data.csv"]
+curr_data_string = ********
 curr_data_result = separator.join(curr_data_string)
 curr_data_df = pd.read_csv(curr_data_result)
 
-curr_parsed_data_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "ParsedData.csv"]
+curr_parsed_data_string = ********
 curr_parsed_data_result = separator.join(curr_parsed_data_string)
 curr_parsed_data_df = pd.read_csv(curr_parsed_data_result)
 
-errorTab_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Data CSVs", "NuWay", "TestEnvError.csv"]
+errorTab_string = ********
 errorTab_result = separator.join(errorTab_string)
 errorTab_df = pd.read_csv(errorTab_result)
 
@@ -57,7 +57,7 @@ errorTab.clear()
 gd.set_with_dataframe(errorTab, errorTab_df)
 
 ##Update audit log
-csv_string = ["C:", "Users", login, "OneDrive - eBay Inc", "AC-Scripting", "Audit CSVs", "AuditLog.csv"]
+csv_string = ********
 result = separator.join(csv_string)
 audit_df = pd.read_csv(result)
 
