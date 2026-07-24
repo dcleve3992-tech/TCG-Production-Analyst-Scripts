@@ -1,0 +1,131 @@
+import gspread
+import pandas as pd
+import gspread_dataframe as gd
+from datetime import datetime, timedelta
+import datetime as dt
+import time
+import os
+import numpy as np
+import pytz
+import datetime as dt
+
+login = os.getlogin()
+separator = '\\'
+startTime = time.time()
+
+gc=gspread.service_account()
+
+filename = separator.join(["C:", "Users", login, "Desktop", "Python", "Credentials.txt"])
+with open(filename, "rt") as f:
+    text = f.readline()
+username, password, account = text.strip().split('~')
+
+import snowflake.connector
+from snowflake.connector import connect
+snowflake_pull = connect(user=username, password=password, account=account)
+
+##PVP SQ Data
+sq_sql = ("""
+select
+    distinct category.******** as game_name
+    , directorder.******** as order_number
+    , shippingqueue.******** as shipping_queue_number
+
+from
+********.directorder
+inner join ********.shippingqueue on directorder.******** = shippingqueue.********
+inner join ********.sellerorder on directorder.******** = sellerorder.********
+inner join ********.sellerorderproduct on sellerorder.******** = sellerorderproduct.********
+inner join ********t.productcondition on sellerorderproduct.******** = productcondition.********
+inner join ********.product on productcondition.******** = product.********
+inner join ********.category on product.******** = category.********
+
+where
+    directorder.createdat::date >= cast(dateadd(dd, -150, getdate()) as date)
+    and ((game_name = 'Magic') or (game_name = 'Pokemon') or (game_name = 'YuGiOh'))
+
+order by
+    order_number
+    , shipping_queue_number
+    , game_name
+
+""")
+
+cursor = snowflake_pull.cursor()
+cursor.execute(sq_sql)
+
+sq_df = cursor.fetch_pandas_all()
+
+sq_df.drop(sq_df.filter(like='Unnamed'), axis=1, inplace=True)
+sq_df.dropna(subset=['ORDER_NUMBER'], inplace=True)
+
+sq_df['SHIPPING_QUEUE_NUMBER'] = sq_df['SHIPPING_QUEUE_NUMBER'].str.lower()
+
+sq_df.rename(columns={'SHIPPING_QUEUE_NUMBER':'Subtask'}, inplace=True)
+
+##Create csv
+sq_string = ********
+sq_result = separator.join(sq_string)
+sq_df.to_csv(sq_result, index=False)
+
+##Tix data
+sql_tix = (r"""
+select
+  zendesk.******** as tix_id
+  , left(********,11) as ticket_order_number_1
+  , right(********,11) as ticket_order_number_2
+  , regexp_substr(********,'\\d{6}-\\w{4}') as comment_body
+  , regexp_substr(********,'\\d{6}-\\w{4}') as title
+  , case when contains(********,********) or contains(********,********) then 'card' end as card_tag
+  , case when contains(********,********) then 'qty' end as qty_tag
+  , case when contains(********,********) or contains(********,********) then 'pkg' end as pkg_tag
+  , case when contains(********, ********) then 'ctf' end as ctf_tag
+  , case when contains(********, ********) then 'cnd' end as cnd_tag
+
+from
+********
+inner join ******** on ******** = ********
+
+where ********::date >= cast(dateadd(dd, -150, getdate()) as date)
+
+group by
+    ********
+    , ********
+    , ********
+    , ********
+    , ********
+
+""")
+
+cursor = snowflake_pull.cursor()
+cursor.execute(sql_tix)
+
+tix_data_df = cursor.fetch_pandas_all()
+
+tix_data_df.drop(tix_data_df.filter(like='Unnamed'), axis=1, inplace=True)
+tix_data_df.dropna(subset=['TIX_ID'], inplace=True)
+
+tix_data_df[tix_data_df.isna()] = 0
+
+##Create csv
+tix_data_string = ********
+tix_data_result = separator.join(tix_data_string)
+tix_data_df.to_csv(tix_data_result, index=False)
+
+##Update audit log
+csv_string = ********
+result = separator.join(csv_string)
+audit_df = pd.read_csv(result)
+
+executionTime = (time.time() - startTime)
+dt_string = datetime.now(pytz.timezone('America/New_York')).strftime("%m/%d/%Y %H:%M:%S")
+script_name = os.path.basename(__file__).replace('.py', '')
+
+new_audit = {'Timestamp': dt_string, 'Execution Time': executionTime, 'Script': script_name}
+
+new_audit_df = pd.DataFrame(data=new_audit, index=[0])
+
+audit_df = pd.concat([audit_df, new_audit_df])
+audit_df.dropna(subset=["Timestamp"], inplace=True)
+
+audit_df.to_csv(result, index=False)
