@@ -1,0 +1,171 @@
+import gspread
+import pandas as pd
+import gspread_dataframe as gd
+from datetime import datetime, timedelta
+import datetime as dt
+import time
+import os
+import numpy as np
+import pytz
+import datetime as dt
+
+login = os.getlogin()
+separator = '\\'
+startTime = time.time()
+
+gc=gspread.service_account()
+
+import snowflake.connector
+from snowflake.connector import connect
+snowflake_pull = connect(********)
+
+##Import RI Data
+sql_ri = ("""
+with
+    ri_whole as (
+      select
+        seller_orders.order_number as seller_order_number
+        , order_items.product_condition_id as pcid
+        , order_items.total_usd as "Sold Product Amount USD"
+        , ********_invoices.********_invoice_number as ri_number
+        , concat(pcid, ri_number) as identifier
+        , seller_orders.seller_********::date as "Seller ********"
+        , order_items.quantity as "Sold Product Quantity"
+        , ********_invoices.created_at_et::date as "ri_created_date"
+        , ********_invoices.received_at_et::date as "********_date"
+        , ********_invoices.********_ended_at_et::date as "********_date"
+        , ********_invoices.shelved_at_et::date as "shelving_date"
+        , case
+            when seller_orders.seller_******** is null then ********
+            when (seller_orders.seller_******** <= ********_invoices.created_at_et) or (********_invoices.created_at_et is null) then 'Before RI ********'
+            when (seller_orders.seller_******** < ********_invoices.received_at_et) or (********_invoices.received_at_et is null) then 'Before RI ********'
+            when (seller_orders.seller_******** < ********_invoices.********_ended_at_et) or (********_invoices.********_ended_at_et is null) then 'Before RI ********'
+            when seller_orders.seller_******** is not null then ********
+          else null
+        end as ********
+        , ********_invoices.was_******** as "was_********"
+
+      from ********.********.********_invoices
+        left outer join ********.********.********mOrder on ********.********.********mOrder.********mOrderNumber = ********_invoices.********_invoice_number
+        left outer join ********.********.********mOrderSellerOrderProduct on ********.********.********mOrderSellerOrderProduct.********mOrderId = ********.********.********mOrder.********mOrderId
+        left outer join ********.********.order_items on ********.********.order_items.id = ********.********.********mOrderSellerOrderProduct.SellerOrderProductId and ********.********.********mOrderSellerOrderProduct.hvr_deleted = 0
+        inner join ********.********.seller_orders on ********.********.seller_orders.id = ********.********.order_items.seller_order_id
+        inner join ********.********.orders on ********.********.orders.id = ********.********.seller_orders.order_id
+        left outer join ********.********.******** on seller_orders.id = ********.seller_order_id
+        left outer join ********.********.sellers on sellers.key = ********_invoices.********
+
+      where
+        orders.status = 'Complete'
+        and seller_orders.is_********_order = true
+        ********
+        ********
+        and len(********_invoices.********_invoice_number) = 26
+        and split_part(********_invoices.********_invoice_number, '-', 3) in(********)
+    )
+
+    , ri_discreps as (
+      select
+        ********_invoice_products.product_condition_id as pcid
+        , ********_invoice_products.total_discrepancies as total_discreps
+        , ********_invoice_products.********_invoice_number as ri_number
+        , concat(pcid, ri_number) as identifier
+
+      from ********.********.********_invoice_products
+        inner join ********.********.********_invoices on ********_invoice_products.********_invoice_number = ********_invoices.********_invoice_number
+        inner join ********.********.sellers on sellers.key = ********_invoices.********
+
+      where
+         split_part(********_invoice_products.********_invoice_number, '-', 3) in(********)
+         and len(********_invoice_products.********_invoice_number) = 26
+         ********
+         ********
+    )
+
+    select
+        ri_whole.*
+        , ri_discreps.total_discreps as "Total Discreps"
+
+    from ri_whole
+        right outer join ri_discreps on ri_discreps.identifier = ri_whole.identifier
+
+""")
+
+cursor = snowflake_pull.cursor()
+cursor.execute(sql_ri)
+
+ri_df = cursor.fetch_pandas_all()
+ri_df.drop(ri_df.filter(like='Unnamed'), axis=1, inplace=True)
+
+ri_df = ri_df[['Sold Product Amount USD', ********, 'Seller ********', 'Sold Product Quantity', 'Total Discreps', 'ri_created_date', '********_date', '********_date', 'shelving_date', 'was_********']]
+
+ri_df["lost_to_discreps"] = ri_df['Sold Product Amount USD'].astype('float64') * ri_df['Total Discreps'].astype('float64')
+
+ri_df["cards_awaiting_********"] = 0.0
+ri_df["value_awaiting_********"] = 0.0
+
+ri_df["cards_awaiting_********"] = 0.0
+ri_df["value_awaiting_********"] = 0.0
+
+ri_df["cards_awaiting_********"] = 0.0
+ri_df["value_awaiting_********"] = 0.0
+
+ri_df.loc[(ri_df['********?'] == 'Before RI ********') & (pd.isnull(ri_df['ri_created_date']) == True) & (ri_df['was_********'] == False), 'cards_awaiting_********'] = ri_df['Sold Product Quantity']
+ri_df.loc[(ri_df['********?'] == 'Before RI ********') & (pd.isnull(ri_df['ri_created_date']) == True) & (ri_df['was_********'] == False), 'value_awaiting_********'] = ri_df['Sold Product Amount USD']
+
+ri_df.loc[(ri_df['********?'] == 'Before RI ********') & (pd.isnull(ri_df['********_date']) == True) & (ri_df['was_********'] == False), 'cards_awaiting_********'] = ri_df['Sold Product Quantity']
+ri_df.loc[(ri_df['********?'] == 'Before RI ********') & (pd.isnull(ri_df['********_date']) == True) & (ri_df['was_********'] == False), 'value_awaiting_********'] = ri_df['Sold Product Amount USD']
+
+ri_df.loc[(ri_df['********?'] == 'Before RI ********') & (pd.isnull(ri_df['********_date']) == True) & (ri_df['was_********'] == False), 'cards_awaiting_********'] = ri_df['Sold Product Quantity']
+ri_df.loc[(ri_df['********?'] == 'Before RI ********') & (pd.isnull(ri_df['********_date']) == True) & (ri_df['was_********'] == False), 'value_awaiting_********'] = ri_df['Sold Product Amount USD']
+
+##Aggragate data
+ri_df["combined"] = ri_df['Seller ********'].astype(str) + ri_df['********?'].astype(str)
+
+dollar_amount = ri_df.groupby('combined')['Sold Product Amount USD'].sum()
+ri_df = pd.merge(ri_df, dollar_amount, how='right', on='combined')
+ri_df.rename(columns={'Sold Product Amount USD_x':'Sold Product Amount USD', 'Sold Product Amount USD_y':'dollar_amount_per_day'}, inplace=True)
+
+product_quantity = ri_df.groupby('combined')['Sold Product Quantity'].sum()
+ri_df = pd.merge(ri_df, product_quantity, how='right', on='combined')
+ri_df.rename(columns={'Sold Product Quantity_x':'Sold Product Quantity', 'Sold Product Quantity_y':'product_amount_per_day'}, inplace=True)
+
+lost_to_discreps = ri_df.groupby('combined')['lost_to_discreps'].sum()
+ri_df = pd.merge(ri_df, lost_to_discreps, how='right', on='combined')
+ri_df.rename(columns={'lost_to_discreps_x':'lost_to_discreps', 'lost_to_discreps_y':'dollars_recouped_from_discreps_per_day_per_category'}, inplace=True)
+
+total_discreps = ri_df.groupby('combined')['Total Discreps'].sum()
+ri_df = pd.merge(ri_df, total_discreps, how='right', on='combined')
+ri_df.rename(columns={'Total Discreps_x':'Total Discreps', 'Total Discreps_y':'total_discreps_per_day_per_category'}, inplace=True)
+
+cards_awaiting_******** = ri_df.groupby('combined')['cards_awaiting_********'].sum()
+ri_df = pd.merge(ri_df, cards_awaiting_********, how='right', on='combined')
+ri_df.rename(columns={'cards_awaiting_********_x':'cards_awaiting_********', 'cards_awaiting_********_y':'total_cards_awaiting_********'}, inplace=True)
+
+value_awaiting_******** = ri_df.groupby('combined')['value_awaiting_********'].sum()
+ri_df = pd.merge(ri_df, value_awaiting_********, how='right', on='combined')
+ri_df.rename(columns={'value_awaiting_********_x':'value_awaiting_********', 'value_awaiting_********_y':'total_value_awaiting_********'}, inplace=True)
+
+cards_awaiting_******** = ri_df.groupby('combined')['cards_awaiting_********'].sum()
+ri_df = pd.merge(ri_df, cards_awaiting_********, how='right', on='combined')
+ri_df.rename(columns={'cards_awaiting_********_x':'cards_awaiting_********', 'cards_awaiting_********_y':'total_cards_awaiting_********'}, inplace=True)
+
+value_awaiting_******** = ri_df.groupby('combined')['value_awaiting_********'].sum()
+ri_df = pd.merge(ri_df, value_awaiting_********, how='right', on='combined')
+ri_df.rename(columns={'value_awaiting_********_x':'value_awaiting_********', 'value_awaiting_********_y':'total_value_awaiting_********'}, inplace=True)
+
+cards_awaiting_******** = ri_df.groupby('combined')['cards_awaiting_********'].sum()
+ri_df = pd.merge(ri_df, cards_awaiting_********, how='right', on='combined')
+ri_df.rename(columns={'cards_awaiting_********_x':'cards_awaiting_********', 'cards_awaiting_********_y':'total_cards_awaiting_********'}, inplace=True)
+
+value_awaiting_******** = ri_df.groupby('combined')['value_awaiting_********'].sum()
+ri_df = pd.merge(ri_df, value_awaiting_********, how='right', on='combined')
+ri_df.rename(columns={'value_awaiting_********_x':'value_awaiting_********', 'value_awaiting_********_y':'total_value_awaiting_********'}, inplace=True)
+
+ri_df.drop_duplicates(subset='combined', inplace=True)
+
+ri_df = ri_df[['Seller ********', '********?', 'dollar_amount_per_day', 'product_amount_per_day', 'total_discreps_per_day_per_category', 'dollars_recouped_from_discreps_per_day_per_category', 'total_cards_awaiting_********', 'total_value_awaiting_********', 'total_cards_awaiting_********', 'total_value_awaiting_********', 'total_cards_awaiting_********', 'total_value_awaiting_********']]
+
+##Write Data to sheet
+finTab = gc.open_by_key(********).worksheet('Data')
+finTab.clear()
+gd.set_with_dataframe(finTab, ri_df)
